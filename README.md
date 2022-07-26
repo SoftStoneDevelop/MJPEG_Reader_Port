@@ -1,5 +1,5 @@
 # MJPEG_Reader_Port
-C++ Vulkan port MJPEG Reader
+A C++ port of [MJPEG Reader](https://github.com/SoftStoneDevelop/MJPEG-reader) project. On Vulkan and ImGui.
 
 Main different(for user) from C# version:
  - support Linux
