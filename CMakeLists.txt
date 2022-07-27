@@ -9,8 +9,10 @@ project(${NAME} VERSION 0.1.0)
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/Src/*.cpp)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+set(ArrayPool_PATH External/ArrayPool/Src/ArrayPool.hpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/Src
+    ${ArrayPool_PATH}
     )
 
 # TODO: Add tests and install targets if needed.
