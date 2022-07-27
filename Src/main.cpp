@@ -9,6 +9,17 @@ int main(int argc, char* argv[])
     client.Connect(&error);
     client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
 
+    char* arr = new char[1024];
+    while (true)
+    {
+        auto readAsync = client.ReadAsync(arr, 1024);
+        auto recived =  readAsync.get();
+        if (recived <= 0)
+        {
+            break;
+        }
+    }
+
     // Receive until the peer closes the connection
     /*do 
     {

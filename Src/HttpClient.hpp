@@ -5,6 +5,7 @@
 #include <mutex>
 #include <stdlib.h>
 #include <stdio.h>
+#include <future>
 
 #include <windows.h>
 #include <winsock2.h>
@@ -34,16 +35,28 @@ namespace ClientMJPEG
 		void Close();
 
 		bool SendRequestGetOnStream(const std::string& url, std::string* outErrorMessage);
+		std::future<int> ReadAsync(char* buffer, const int& bufferSize);
 
 		const std::string& GetPort() const { return _port; }
 		const std::string& GetHost() const { return _host; }
 
 	private:
+		void readData();
+
 		std::string _host;
 		std::string _port;
 		SOCKET _connectSocket = INVALID_SOCKET;
 		std::mutex _m;
-		bool _sendShutdown = false;
-		bool _isConnected = false;
+		volatile bool _sendShutdown = false;
+		volatile bool _isConnected = false;
+		
+		std::promise<int> _promise;
+		std::thread* _readThread = nullptr;
+		std::condition_variable _cv;
+		volatile bool _isReading = false;
+		volatile bool _streamInProcess = false;
+
+		char* _readBuffer;
+		int _readBufferSize;
 	};
 }//namespace ClientMJPEG

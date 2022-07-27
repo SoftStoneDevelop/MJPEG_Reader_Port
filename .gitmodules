@@ -1,0 +1,3 @@
+[submodule "External/ArrayPool"]
+	path = External/ArrayPool
+	url = https://github.com/SoftStoneDevelop/ArrayPool

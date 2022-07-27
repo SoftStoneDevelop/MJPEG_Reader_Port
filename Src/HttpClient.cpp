@@ -22,6 +22,14 @@ namespace ClientMJPEG
 
 	void HttpClient::Close()
 	{
+		if (_readThread != nullptr)
+		{
+			_readThread->join();
+			delete _readThread;
+		}
+
+		_readBuffer = nullptr;
+
 		if (_isConnected)
 		{
 			closesocket(_connectSocket);
@@ -144,21 +152,57 @@ namespace ClientMJPEG
 			return false;
 		}
 
-		// shutdown the connection since no more data will be sent, for http stream this is want we want
-		iResult = shutdown(_connectSocket, SD_SEND);
-		if (iResult == SOCKET_ERROR)
-		{
-			if (outErrorMessage)
-			{
-				*outErrorMessage = "shutdown 'send' failed with error:" + WSAGetLastError();
-			}
+		_streamInProcess = true;
+		return _streamInProcess;
+	}
 
-			closesocket(_connectSocket);
-			WSACleanup();
-			return false;
+	std::future<int> HttpClient::ReadAsync(char* buffer, const int& bufferSize)
+	{
+		std::lock_guard lg(_m);
+		if (_isReading)
+		{
+			_promise = std::promise<int>();
+			_promise.set_value(0);
+			return _promise.get_future();
 		}
 
-		return true;
+		_promise = std::promise<int>();
+		_isReading = true;
+		_readBuffer = buffer;
+		_readBufferSize = bufferSize;
+
+		if (_readThread == nullptr)
+			_readThread = new std::thread(&HttpClient::readData, this);
+
+		_cv.notify_all();
+		return _promise.get_future();
+	}
+
+	void HttpClient::readData()
+	{
+		while (true)
+		{
+			std::unique_lock<std::mutex> lock(_m);
+			_cv.wait(lock, [&] {return _isReading; });
+			if (!_streamInProcess)
+			{
+				break;
+			}
+
+			auto recived = recv(_connectSocket, _readBuffer, _readBufferSize, 0);
+			if (recived == 0 || recived < 0)
+			{
+				closesocket(_connectSocket);
+				WSACleanup();
+				_promise.set_value(recived);
+				break;
+			}
+
+			_isReading = false;
+			_readBuffer = nullptr;
+			lock.unlock();
+			_promise.set_value(recived);
+		}
 	}
 
 }//namespace ClientMJPEG
