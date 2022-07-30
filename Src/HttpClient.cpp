@@ -22,10 +22,10 @@ namespace ClientMJPEG
 
 	void HttpClient::Close()
 	{
-		_streamInProcess = false;
 		{
-			_cv.notify_all();
 			std::lock_guard lg(_m);
+			_streamInProcess = false;
+			_cv.notify_all();
 		}
 
 		if (_readThread != nullptr)
@@ -189,7 +189,7 @@ namespace ClientMJPEG
 		while (_streamInProcess)
 		{
 			std::unique_lock<std::mutex> lock(_m);
-			_cv.wait(lock, [&] {return _isReading; });
+			_cv.wait(lock, [&] {return _isReading || !_streamInProcess; });
 			if (!_streamInProcess)
 			{
 				break;
