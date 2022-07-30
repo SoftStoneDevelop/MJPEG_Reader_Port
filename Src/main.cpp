@@ -1,13 +1,28 @@
 #pragma once
 
 #include "HttpClient.hpp"
-#include "../ArrayPool.hpp"
+#include "ArrayPool.hpp"
 #include "Helper/ArrayExt.hpp"
 #include <iostream>
 #include <fstream>
+#include "first_app.hpp"
 
 int main(int argc, char* argv[])
 {
+    lve::FirstApp app{};
+
+    try
+    {
+        app.run();
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+
     bool stop = false;
 
     ClientMJPEG::HttpClient client("31.160.161.51", 8081);
