@@ -22,6 +22,12 @@ namespace ClientMJPEG
 
 	void HttpClient::Close()
 	{
+		_streamInProcess = false;
+		{
+			_cv.notify_all();
+			std::lock_guard lg(_m);
+		}
+
 		if (_readThread != nullptr)
 		{
 			_readThread->join();
@@ -159,7 +165,7 @@ namespace ClientMJPEG
 	std::future<int> HttpClient::ReadAsync(char* buffer, const int& bufferSize)
 	{
 		std::lock_guard lg(_m);
-		if (_isReading)
+		if (!_streamInProcess || _isReading)
 		{
 			_promise = std::promise<int>();
 			_promise.set_value(0);
@@ -180,7 +186,7 @@ namespace ClientMJPEG
 
 	void HttpClient::readData()
 	{
-		while (true)
+		while (_streamInProcess)
 		{
 			std::unique_lock<std::mutex> lock(_m);
 			_cv.wait(lock, [&] {return _isReading; });

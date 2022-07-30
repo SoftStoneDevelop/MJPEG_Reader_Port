@@ -9,6 +9,10 @@
 #include <chrono>
 #include <numeric>
 #include "imgui.hpp"
+#include "HttpClient.hpp"
+#include <ArrayPool.hpp>
+#include "Helper/ArrayExt.hpp"
+#include <iostream>
 
 namespace lve {
 
@@ -34,27 +38,208 @@ namespace lve {
 
 	FirstApp::~FirstApp() 
 	{
+        _stop = true;
+        readCameraThread.join();
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
 	}
 
+	void FirstApp::readImageStream()
+	{
+        ClientMJPEG::HttpClient client("31.160.161.51", 8081);
+        std::string error;
+        client.Connect(&error);
+        client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
+
+        auto pool = ArrayPool::ArrayPool<char>();
+        std::string contentLengthBytes = "\nContent-Length: ";
+        std::string newLineBytes = "\n";
+        std::string carriageReturnSize = "\r";
+
+        int readBufferSize = 1024;
+        int realSize;
+        char* readBuffer = pool.Rent(readBufferSize, realSize);
+        readBufferSize = realSize;
+
+        int imageBufferSize = readBufferSize;
+        char* imageBuffer = pool.Rent(imageBufferSize, realSize);
+        imageBufferSize = realSize;
+        int newIBufferSize = -1;
+        int payloadSize = 0;
+        int payloadOffset = 0;
+
+        char* lengthImageBuffer = pool.Rent(sizeof(int), realSize);
+
+        std::future<int> readAsync = client.ReadAsync(readBuffer, readBufferSize);
+        while (!_stop)
+        {
+            auto readSize = readAsync.get();
+            if (readSize <= 0)
+            {
+                break;
+            }
+
+            if (newIBufferSize != -1)
+            {
+                char* newImageBuffer = pool.Rent(newIBufferSize, realSize);
+                std::copy(imageBuffer, imageBuffer + payloadSize, newImageBuffer);
+                payloadOffset = 0;
+                pool.Return(imageBuffer);
+                imageBuffer = newImageBuffer;
+                imageBufferSize = realSize;
+
+                char* newReadBuffer = pool.Rent(newIBufferSize / 2, realSize);
+                std::copy(readBuffer, readBuffer + readBufferSize, newReadBuffer);
+                pool.Return(readBuffer);
+                readBuffer = newReadBuffer;
+                readBufferSize = realSize;
+
+                newIBufferSize = -1;
+            }
+
+            if (imageBufferSize - payloadSize < readBufferSize)
+            {
+                char* newImageBuffer = pool.Rent(imageBufferSize * 2, realSize);
+                std::copy(imageBuffer, imageBuffer + payloadSize, newImageBuffer);
+                pool.Return(imageBuffer);
+                imageBuffer = newImageBuffer;
+                imageBufferSize = realSize;
+            }
+
+            if (imageBufferSize - payloadOffset - payloadSize < readBufferSize)
+            {
+                std::shift_left(imageBuffer, imageBuffer + payloadOffset + payloadSize, imageBufferSize - payloadSize);
+                payloadOffset = 0;
+            }
+
+            std::copy(readBuffer, readBuffer + readSize, imageBuffer + payloadOffset + payloadSize);
+            payloadSize += readSize;
+
+            readAsync = client.ReadAsync(readBuffer, readBufferSize);
+
+            int processOffset = 0;
+            bool process = true;
+            while (process)
+            {
+                if (payloadSize - payloadOffset <= 0)
+                {
+                    process = false;
+                    continue;
+                }
+
+                int currentIndex = 0;
+                char* processStart = imageBuffer + payloadOffset;
+                int processSize = payloadSize;
+
+                currentIndex =
+                    ArrayExt::FindBytesIndex<char>(
+                        processStart,
+                        processSize,
+                        contentLengthBytes.c_str(),
+                        contentLengthBytes.size()
+                        );
+
+                processSize -= currentIndex;
+                if (currentIndex == -1)
+                {
+                    process = false;
+                    continue;
+                }
+
+                currentIndex += contentLengthBytes.size();
+                processSize -= contentLengthBytes.size();
+                if (currentIndex > payloadSize)
+                {
+                    process = false;
+                    continue;
+                }
+
+                auto endNewLine =
+                    ArrayExt::FindBytesIndex<char>(
+                        processStart + currentIndex,
+                        processSize,
+                        newLineBytes.c_str(),
+                        newLineBytes.size()
+                        );
+                if (endNewLine == -1)
+                {
+                    process = false;
+                    continue;
+                }
+
+                auto imageSize = std::strtol(processStart + currentIndex, nullptr, 10);
+                if (imageSize < 1000)
+                {
+                    int s = 15;
+                }
+                currentIndex += endNewLine;
+                processSize -= endNewLine;
+                if (imageSize * 2 > imageBufferSize)
+                {
+                    newIBufferSize = imageSize * 2;
+                }
+
+                if (processSize <= newLineBytes.size() * 2 + carriageReturnSize.size())
+                {
+                    process = false;
+                    continue;
+                }
+                else
+                {
+                    currentIndex += newLineBytes.size() * 2 + carriageReturnSize.size();
+                    processSize -= newLineBytes.size() * 2 + carriageReturnSize.size();
+                }
+
+                if (processSize < imageSize)
+                {
+                    process = false;
+                    continue;
+                }
+
+                if (imageSize == processSize)
+                {
+                    payloadSize = 0;
+                    payloadOffset = 0;
+                    process = false;
+                }
+                else
+                {
+                    payloadOffset += imageSize + currentIndex;
+                    payloadSize -= imageSize + currentIndex;
+                }
+
+                auto guard = std::lock_guard(_m);
+                if (_image == nullptr)
+                {
+                    _image = pool.Rent(imageSize, realSize);
+                    _imageSize = imageSize;
+                    _arrSize = realSize;
+                    std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
+                }
+                else if (_arrSize < imageSize)
+                {
+                    pool.Return(_image);
+                    _image = pool.Rent(imageSize, realSize);
+                    _imageSize = imageSize;
+                    _arrSize = realSize;
+                    std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
+                }
+                std::cout << "Image with size:" << imageSize << std::endl;
+                std::cout << std::endl;
+            }
+        }
+
+        pool.Return(imageBuffer);
+        pool.Return(readBuffer);
+        pool.Return(lengthImageBuffer);
+	}
+
 	void FirstApp::run() {
-
-		auto globalSetLayout = LveDescriptorSetLayout::Builder(lveDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS)
-			.build()
-			;
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-
-		while (!lveWindow.shouldClose()) {
+		readCameraThread = std::thread(&FirstApp::readImageStream, this);
+		while (!lveWindow.shouldClose()) 
+        {
 			glfwPollEvents();
-
-            auto newTime = std::chrono::high_resolution_clock::now();
-            float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
-            currentTime = newTime;
-
 			if (auto commandBuffer = lveRenderer.beginFrame())
 			{
 				int frameIndex = lveRenderer.getFrameIndex();
@@ -64,7 +249,21 @@ namespace lve {
 
 				//order here matters
 				ImGuiNewFrame();
-				ImGui::Button("Hello button");
+#ifdef IMGUI_HAS_VIEWPORT
+                ImGuiViewport* viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(viewport->GetWorkPos());
+                ImGui::SetNextWindowSize(viewport->GetWorkSize());
+                ImGui::SetNextWindowViewport(viewport->ID);
+#else 
+                ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+                ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+#endif
+                ImGui::Begin("Viewer");
+                {
+                    auto lock = std::lock_guard(_m);
+                    ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "Error text place");
+                }
+                ImGui::End();
 				ImGuiRender(commandBuffer);
 
 				lveRenderer.endSwapChainRenderPass(commandBuffer);

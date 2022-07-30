@@ -7,6 +7,8 @@
 
 #include <memory>
 #include <vector>
+#include <thread>
+#include <mutex>
 
 namespace lve {
 
@@ -24,6 +26,7 @@ namespace lve {
 
 		void run();
 	private:
+		void readImageStream();
 		
 		LveWindow lveWindow{ WIDTH, HEIGHT, "MJPEG Viewer" };
 		LveDevice lveDevice{ lveWindow };
@@ -31,5 +34,13 @@ namespace lve {
 
 		// note: order of declarations matters
 		std::unique_ptr<LveDescriptorPool> imGuiPool{};
+		std::thread readCameraThread;
+		char* _image = nullptr;
+		int _imageSize = 0;
+		int _arrSize;
+
+		volatile bool _stop = false;
+
+		std::mutex _m;
 	};
 }
