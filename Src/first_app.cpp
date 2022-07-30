@@ -4,10 +4,6 @@
 #include "first_app.hpp"
 #include "lve_buffer.hpp"
 
-#include <stdexcept>
-#include <array>
-#include <chrono>
-#include <numeric>
 #include "imgui.hpp"
 #include "HttpClient.hpp"
 #include <ArrayPool.hpp>
@@ -169,10 +165,6 @@ namespace lve {
                 }
 
                 auto imageSize = std::strtol(processStart + currentIndex, nullptr, 10);
-                if (imageSize < 1000)
-                {
-                    int s = 15;
-                }
                 currentIndex += endNewLine;
                 processSize -= endNewLine;
                 if (imageSize * 2 > imageBufferSize)
@@ -225,6 +217,12 @@ namespace lve {
                     _arrSize = realSize;
                     std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
                 }
+                else
+                {
+                    _imageSize = imageSize;
+                    std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
+                }
+
                 std::cout << "Image with size:" << imageSize << std::endl;
                 std::cout << std::endl;
             }
