@@ -9,6 +9,8 @@
 #include <ArrayPool.hpp>
 #include "Helper/ArrayExt.hpp"
 #include <iostream>
+#include "Definitions/DefaultSamplersNames.hpp"
+#include <fstream>
 
 namespace lve {
 
@@ -49,7 +51,7 @@ namespace lve {
         client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
 
         auto pool = ArrayPool::ArrayPool<char>();
-        std::string contentLengthBytes = "\nContent-Length: ";
+        std::string contentLengthBytes = "Content-Length: ";
         std::string newLineBytes = "\n";
         std::string carriageReturnSize = "\r";
 
@@ -68,6 +70,8 @@ namespace lve {
         char* lengthImageBuffer = pool.Rent(sizeof(int), realSize);
 
         std::future<int> readAsync = client.ReadAsync(readBuffer, readBufferSize);
+
+        int imageSize = -1;
         while (!_stop)
         {
             auto readSize = readAsync.get();
@@ -84,12 +88,6 @@ namespace lve {
                 pool.Return(imageBuffer);
                 imageBuffer = newImageBuffer;
                 imageBufferSize = realSize;
-
-                char* newReadBuffer = pool.Rent(newIBufferSize / 2, realSize);
-                std::copy(readBuffer, readBuffer + readBufferSize, newReadBuffer);
-                pool.Return(readBuffer);
-                readBuffer = newReadBuffer;
-                readBufferSize = realSize;
 
                 newIBufferSize = -1;
             }
@@ -113,6 +111,10 @@ namespace lve {
             payloadSize += readSize;
 
             readAsync = client.ReadAsync(readBuffer, readBufferSize);
+            if (imageSize > 0 && payloadSize < imageSize)
+            {
+                continue;
+            }
 
             int processOffset = 0;
             bool process = true;
@@ -164,7 +166,7 @@ namespace lve {
                     continue;
                 }
 
-                auto imageSize = std::strtol(processStart + currentIndex, nullptr, 10);
+                imageSize = std::strtol(processStart + currentIndex, nullptr, 10);
                 currentIndex += endNewLine;
                 processSize -= endNewLine;
                 if (imageSize * 2 > imageBufferSize)
@@ -201,30 +203,26 @@ namespace lve {
                     payloadSize -= imageSize + currentIndex;
                 }
 
-                auto guard = std::lock_guard(_m);
-                if (_image == nullptr)
                 {
-                    _image = pool.Rent(imageSize, realSize);
-                    _imageSize = imageSize;
-                    _arrSize = realSize;
-                    std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
-                }
-                else if (_arrSize < imageSize)
-                {
-                    pool.Return(_image);
-                    _image = pool.Rent(imageSize, realSize);
-                    _imageSize = imageSize;
-                    _arrSize = realSize;
-                    std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
-                }
-                else
-                {
-                    _imageSize = imageSize;
-                    std::copy(processStart + currentIndex, processStart + currentIndex + imageSize, _image);
+                    auto guard = std::lock_guard(_m);
+                    if (lveTextureStorage.loadTexture(processStart + currentIndex, imageSize, std::format("currentCameraFrame {}", lastIdTexture + 1)))
+                    {
+                        lastIdTexture++;
+                    }
+                    else
+                    {
+                        std::fstream file;
+                        file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
+                        file.write(processStart + currentIndex, imageSize);
+                        file.flush();
+                        file.close();
+                        std::cout << "Image fail with size:" << imageSize << std::endl;
+                    }
                 }
 
                 std::cout << "Image with size:" << imageSize << std::endl;
                 std::cout << std::endl;
+                imageSize = -1;
             }
         }
 
@@ -259,6 +257,15 @@ namespace lve {
                 ImGui::Begin("Viewer");
                 {
                     auto lock = std::lock_guard(_m);
+                    int id = lastIdTexture;
+                    auto name = std::format("currentCameraFrame {}", id);
+                    if (lveTextureStorage.ContainTexture(name))
+                    {
+                        auto tData = lveTextureStorage.getTextureData(name);
+                        auto info = lveTextureStorage.getDescriptorSet(name, defaultSamplerName);
+                        ImGui::Image(info, { (float)tData.texWidth, (float)tData.texHeight });
+                    }
+
                     ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "Error text place");
                 }
                 ImGui::End();

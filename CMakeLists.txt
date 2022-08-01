@@ -21,6 +21,12 @@ if (NOT IMGUI_PATH)
   set(IMGUI_PATH External/imgui)
 endif()
 
+# If STB_IMAGE_PATH not specified in .env.cmake, try fetching from git repo
+if (NOT STB_IMAGE_PATH)
+  message(STATUS "STB_IMAGE_PATH not specified in .env.cmake, using external/stb")
+  set(STB_IMAGE_PATH External/stb)
+endif()
+
 set(ArrayPool_PATH External/ArrayPool/Src/)
 
 if (DEFINED VULKAN_SDK_PATH)
@@ -79,6 +85,7 @@ if (WIN32)
     ${GLFW_INCLUDE_DIRS}
     ${ArrayPool_PATH}
     ${IMGUI_PATH}
+    ${STB_IMAGE_PATH}
     )
 
   target_link_directories(${PROJECT_NAME} PUBLIC
@@ -94,6 +101,7 @@ elseif (UNIX)
       ${PROJECT_SOURCE_DIR}/src
       ${ArrayPool_PATH}
       ${IMGUI_PATH}
+      ${STB_IMAGE_PATH}
     )
     target_link_libraries(${PROJECT_NAME} glfw ${Vulkan_LIBRARIES})
 endif()

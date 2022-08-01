@@ -9,6 +9,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include "lve_texture_storage.hpp"
 
 namespace lve {
 
@@ -30,15 +31,13 @@ namespace lve {
 		
 		LveWindow lveWindow{ WIDTH, HEIGHT, "MJPEG Viewer" };
 		LveDevice lveDevice{ lveWindow };
+		LveTextureStorage lveTextureStorage{ lveDevice };
 		LveRenderer lveRenderer{ lveWindow, lveDevice };
 
 		// note: order of declarations matters
 		std::unique_ptr<LveDescriptorPool> imGuiPool{};
 		std::thread readCameraThread;
-		char* _image = nullptr;
-		int _imageSize = 0;
-		int _arrSize;
-
+		volatile int lastIdTexture = 0;
 		volatile bool _stop = false;
 
 		std::mutex _m;
