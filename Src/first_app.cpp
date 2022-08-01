@@ -128,6 +128,11 @@ namespace lve {
             auto boundaryEnd = false;
             for (int i = 0; i < readSize; i++)
             {
+                if (readBuffer[i] == '"')
+                {
+                    continue;
+                }
+
                 if (readBuffer[i] == '\r')
                 {
                     boundaryEnd = true;
