@@ -51,27 +51,19 @@ namespace lve {
         client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
 
         auto pool = ArrayPool::ArrayPool<char>();
-        std::string contentLengthBytes = "Content-Length: ";
-        std::string newLineBytes = "\n";
-        std::string carriageReturnSize = "\r";
+        std::string boundaryMark = "boundary=";
 
-        int readBufferSize = 1024;
+
+
+        int readBufferSize = 4000;
         int realSize;
         char* readBuffer = pool.Rent(readBufferSize, realSize);
         readBufferSize = realSize;
 
-        int imageBufferSize = readBufferSize;
-        char* imageBuffer = pool.Rent(imageBufferSize, realSize);
-        imageBufferSize = realSize;
-        int newIBufferSize = -1;
-        int payloadSize = 0;
-        int payloadOffset = 0;
-
-        char* lengthImageBuffer = pool.Rent(sizeof(int), realSize);
-
         std::future<int> readAsync = client.ReadAsync(readBuffer, readBufferSize);
 
-        int imageSize = -1;
+        int indxBoundary = 0;
+        auto foundMark = false;
         while (!_stop)
         {
             auto readSize = readAsync.get();
@@ -80,16 +72,102 @@ namespace lve {
                 break;
             }
 
-            if (newIBufferSize != -1)
+            int index = 0;
+            for (; index < readSize; index++)
             {
-                char* newImageBuffer = pool.Rent(newIBufferSize, realSize);
-                std::copy(imageBuffer, imageBuffer + payloadSize, newImageBuffer);
-                payloadOffset = 0;
-                pool.Return(imageBuffer);
-                imageBuffer = newImageBuffer;
-                imageBufferSize = realSize;
+                if (readBuffer[index] == boundaryMark[indxBoundary])
+                {
+                    if (indxBoundary == boundaryMark.size() - 1)
+                    {
+                        index++;
+                        foundMark = true;
+                    }
 
-                newIBufferSize = -1;
+                    indxBoundary++;
+                }
+                else
+                {
+                    indxBoundary = 0;
+                }
+
+                if (foundMark)
+                {
+                    break;
+                }
+            }
+
+            if (foundMark)
+            {
+                if (index == readSize - 1)
+                {
+                    readAsync = client.ReadAsync(readBuffer, readBufferSize);
+                }
+                else
+                {
+                    std::shift_left(readBuffer, readBuffer + readBufferSize, index);
+                    readAsync = client.ReadAsync(readBuffer + (readSize - index), readBufferSize - index);
+                }
+                
+                break;
+            }
+
+            readAsync = client.ReadAsync(readBuffer, readBufferSize);
+        }
+
+        char* boundary = pool.Rent(77, realSize);
+        int boundarySize = 0;
+        int payloadSize = 0;
+        while (!_stop)
+        {
+            auto readSize = readAsync.get();
+            if (readSize <= 0)
+            {
+                break;
+            }
+
+            auto boundaryEnd = false;
+            for (int i = 0; i < readSize; i++)
+            {
+                if (readBuffer[i] == '\r')
+                {
+                    boundaryEnd = true;
+                    if (i == readSize - 1)
+                    {
+                        readAsync = client.ReadAsync(readBuffer, readBufferSize);
+                    }
+                    else
+                    {
+                        std::shift_left(readBuffer + i, readBuffer + readSize, readBufferSize - i);
+                        readAsync = client.ReadAsync(readBuffer + i, readBufferSize - i);
+                        payloadSize = i;
+                    }
+
+                    break;
+                }
+
+                boundary[boundarySize++] = readBuffer[i];
+            }
+
+            if (boundaryEnd)
+            {
+                break;
+            }
+
+            readAsync = client.ReadAsync(readBuffer, readBufferSize);
+        }
+
+        int imageBufferSize = readBufferSize;
+        char* imageBuffer = pool.Rent(imageBufferSize, realSize);
+        imageBufferSize = realSize;
+        int payloadOffset = 0;
+
+        const char* startDataMark = "\r\n\r\n";
+        while (!_stop)
+        {
+            auto readSize = readAsync.get();
+            if (readSize <= 0)
+            {
+                break;
             }
 
             if (imageBufferSize - payloadSize < readBufferSize)
@@ -111,124 +189,79 @@ namespace lve {
             payloadSize += readSize;
 
             readAsync = client.ReadAsync(readBuffer, readBufferSize);
-            if (imageSize > 0 && payloadSize < imageSize)
+            
+            char* processStart = imageBuffer + payloadOffset;
+            int processSize = payloadSize;
+            auto boundaryIndex =
+                ArrayExt::FindBytesIndex<char>(
+                    processStart,
+                    processSize,
+                    boundary,
+                    boundarySize
+                    );
+            if (boundaryIndex == -1)
             {
                 continue;
             }
 
-            int processOffset = 0;
-            bool process = true;
-            while (process)
+            processSize = processSize - boundaryIndex - boundarySize;
+            auto startData =
+                ArrayExt::FindBytesIndex<char>(
+                    processStart + boundaryIndex + boundarySize,
+                    processSize - boundaryIndex - boundarySize,
+                    startDataMark,
+                    4
+                    );
+            if (startData == -1)
             {
-                if (payloadSize - payloadOffset <= 0)
-                {
-                    process = false;
-                    continue;
-                }
-
-                int currentIndex = 0;
-                char* processStart = imageBuffer + payloadOffset;
-                int processSize = payloadSize;
-
-                currentIndex =
-                    ArrayExt::FindBytesIndex<char>(
-                        processStart,
-                        processSize,
-                        contentLengthBytes.c_str(),
-                        contentLengthBytes.size()
-                        );
-
-                processSize -= currentIndex;
-                if (currentIndex == -1)
-                {
-                    process = false;
-                    continue;
-                }
-
-                currentIndex += contentLengthBytes.size();
-                processSize -= contentLengthBytes.size();
-                if (currentIndex > payloadSize)
-                {
-                    process = false;
-                    continue;
-                }
-
-                auto endNewLine =
-                    ArrayExt::FindBytesIndex<char>(
-                        processStart + currentIndex,
-                        processSize,
-                        newLineBytes.c_str(),
-                        newLineBytes.size()
-                        );
-                if (endNewLine == -1)
-                {
-                    process = false;
-                    continue;
-                }
-
-                imageSize = std::strtol(processStart + currentIndex, nullptr, 10);
-                currentIndex += endNewLine;
-                processSize -= endNewLine;
-                if (imageSize * 2 > imageBufferSize)
-                {
-                    newIBufferSize = imageSize * 2;
-                }
-
-                if (processSize <= newLineBytes.size() * 2 + carriageReturnSize.size())
-                {
-                    process = false;
-                    continue;
-                }
-                else
-                {
-                    currentIndex += newLineBytes.size() * 2 + carriageReturnSize.size();
-                    processSize -= newLineBytes.size() * 2 + carriageReturnSize.size();
-                }
-
-                if (processSize < imageSize)
-                {
-                    process = false;
-                    continue;
-                }
-
-                if (imageSize == processSize)
-                {
-                    payloadSize = 0;
-                    payloadOffset = 0;
-                    process = false;
-                }
-                else
-                {
-                    payloadOffset += imageSize + currentIndex;
-                    payloadSize -= imageSize + currentIndex;
-                }
-
-                {
-                    auto guard = std::lock_guard(_m);
-                    if (lveTextureStorage.loadTexture(processStart + currentIndex, imageSize, std::format("currentCameraFrame {}", lastIdTexture + 1)))
-                    {
-                        lastIdTexture++;
-                    }
-                    else
-                    {
-                        /*std::fstream file;
-                        file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
-                        file.write(processStart + currentIndex, imageSize);
-                        file.flush();
-                        file.close();*/
-                        std::cout << "Image fail with size:" << imageSize << std::endl;
-                    }
-                }
-
-                std::cout << "Image with size:" << imageSize << std::endl;
-                std::cout << std::endl;
-                imageSize = -1;
+                continue;
             }
+
+            startData += boundaryIndex + boundarySize + 4;
+            if (startData > processSize)
+            {
+                continue;
+            }
+
+            //next boundary is the end of prev
+            auto nextBoundaryIndex =
+                ArrayExt::FindBytesIndex<char>(
+                    processStart + startData,
+                    processSize - startData,
+                    boundary,
+                    boundarySize
+                    );
+
+            if (nextBoundaryIndex == -1)
+            {
+                continue;
+            }
+
+            auto guard = std::lock_guard(_m);
+            if (lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, std::format("currentCameraFrame {}", lastIdTexture + 1)))
+            {
+                lastIdTexture++;
+            }
+            else
+            {
+                /*std::fstream file;
+                file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
+                file.write(processStart + currentIndex, imageSize);
+                file.flush();
+                file.close();*/
+                std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
+            }
+
+            payloadSize -= startData + nextBoundaryIndex;
+            payloadOffset += startData + nextBoundaryIndex;
+
+            std::cout << "Image with size:" << nextBoundaryIndex << std::endl;
+            std::cout << std::endl;
         }
 
         pool.Return(imageBuffer);
         pool.Return(readBuffer);
-        pool.Return(lengthImageBuffer);
+        pool.Return(boundary);
 	}
 
 	void FirstApp::run() {
