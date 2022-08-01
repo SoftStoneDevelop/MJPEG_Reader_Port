@@ -211,11 +211,11 @@ namespace lve {
                     }
                     else
                     {
-                        std::fstream file;
+                        /*std::fstream file;
                         file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
                         file.write(processStart + currentIndex, imageSize);
                         file.flush();
-                        file.close();
+                        file.close();*/
                         std::cout << "Image fail with size:" << imageSize << std::endl;
                     }
                 }
