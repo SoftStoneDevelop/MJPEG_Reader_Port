@@ -118,15 +118,18 @@ namespace lve {
         return true;
     }
 
-    void LveDescriptorPool::freeDescriptors(std::vector<VkDescriptorSet>& descriptors) const {
+    void LveDescriptorPool::freeDescriptors(const VkDescriptorSet* descriptor, int descriptorsCount) const
+    {
         vkFreeDescriptorSets(
             lveDevice.device(),
             descriptorPool,
-            static_cast<uint32_t>(descriptors.size()),
-            descriptors.data());
+            static_cast<uint32_t>(descriptorsCount),
+            descriptor
+        );
     }
 
-    void LveDescriptorPool::resetPool() {
+    void LveDescriptorPool::resetPool() 
+    {
         vkResetDescriptorPool(lveDevice.device(), descriptorPool, 0);
     }
 

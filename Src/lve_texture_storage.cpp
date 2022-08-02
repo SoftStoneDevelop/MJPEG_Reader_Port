@@ -84,13 +84,13 @@ namespace lve {
 
                 return textureSampler;
             }
+
+            return nullptr;
         }
         else
         {
             return textureSamplers[samplerName];
         }
-
-        throw std::runtime_error("Not find sampler with name:" + samplerName);
     }
 
     const LveTextureStorage::TextureData& LveTextureStorage::getTextureData(const std::string& textureName)
@@ -135,7 +135,8 @@ namespace lve {
     {
         VkDeviceSize imageSize = imageData.texWidth * imageData.texHeight * 4;
 
-        if (!pixels) {
+        if (!pixels) 
+        {
             throw std::runtime_error("failed to load image!");
         }
 
@@ -238,25 +239,38 @@ namespace lve {
         textureDatas.erase(textureName);
     }
 
-    void LveTextureStorage::destroyAndFreeTextureData(const TextureData& data) {
+    void LveTextureStorage::destroyAndFreeTextureData(const TextureData& data) 
+    {
+        for (auto i = data.textureDescriptors.begin(); i != data.textureDescriptors.end(); i++)
+        {
+            auto& item = *i;
+            texturePool->freeDescriptors(&item.second, 1);
+        }
+
         vkDestroyImageView(lveDevice.device(), data.imageView, nullptr);
         vkDestroyImage(lveDevice.device(), data.image, nullptr);
         vkFreeMemory(lveDevice.device(), data.imageMemory, nullptr);
     }
 
-    const VkDescriptorSet LveTextureStorage::getDescriptorSet(const std::string& textureName, const std::string& samplerName)
+    const VkDescriptorSet LveTextureStorage::getDescriptorSet(
+        const std::string& textureName,
+        const std::string& samplerName
+    )
     {
-        if (textureDescriptors.count(textureName + samplerName) != 0)
-            return textureDescriptors[textureName + samplerName];
+        if (textureDatas.count(textureName) == 0)
+            return nullptr;
+
+        auto& textureData = textureDatas.at(textureName);
+        if (textureData.textureDescriptors.count(samplerName) != 0)
+            return textureData.textureDescriptors.at(samplerName);
 
         auto descriptorImage = descriptorInfo(samplerName, textureName);
-
         VkDescriptorSet descriptorSet{};
         LveDescriptorWriter(*textureSetLayout, *texturePool)
             .writeImage(0, &descriptorImage)
             .build(descriptorSet);
-        
-        textureDescriptors[textureName + samplerName] = descriptorSet;
+
+        textureData.textureDescriptors[samplerName] = descriptorSet;
         return descriptorSet;
     }
 

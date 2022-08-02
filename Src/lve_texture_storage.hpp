@@ -16,6 +16,7 @@ namespace lve {
 			VkDeviceMemory imageMemory;
 			int texWidth; 
 			int texHeight;
+			std::unordered_map<std::string, VkDescriptorSet> textureDescriptors;
 		};
 
 		LveTextureStorage(LveDevice& device);
@@ -51,6 +52,5 @@ namespace lve {
 		LveDevice& lveDevice;
 		std::unique_ptr<LveDescriptorPool> texturePool;
 		std::unique_ptr<LveDescriptorSetLayout> textureSetLayout;
-		std::unordered_map<std::string, VkDescriptorSet> textureDescriptors;
 	};
 } // namespace lve

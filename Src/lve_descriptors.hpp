@@ -72,7 +72,7 @@ namespace lve {
 
         bool allocateDescriptor(const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet& descriptor) const;
 
-        void freeDescriptors(std::vector<VkDescriptorSet>& descriptors) const;
+        void freeDescriptors(const VkDescriptorSet* descriptor, int descriptorsCount) const;
 
         void resetPool();
 
