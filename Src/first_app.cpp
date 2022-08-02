@@ -114,8 +114,10 @@ namespace lve {
             readAsync = client.ReadAsync(readBuffer, readBufferSize);
         }
 
-        char boundary[70];
-        int boundarySize = 0;
+        char boundary[72];
+        boundary[0] = '-';
+        boundary[1] = '-';
+        int boundarySize = 2;
         int payloadSize = 0;
         while (!_stop)
         {
@@ -239,6 +241,14 @@ namespace lve {
 
             if (nextBoundaryIndex == -1)
             {
+                continue;
+            }
+
+            if (nextBoundaryIndex == 0)
+            {
+                //no image data
+                payloadSize -= startData;
+                payloadOffset += startData;
                 continue;
             }
 
