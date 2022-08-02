@@ -114,7 +114,7 @@ namespace lve {
             readAsync = client.ReadAsync(readBuffer, readBufferSize);
         }
 
-        char* boundary = pool.Rent(77, realSize);
+        char boundary[70];
         int boundarySize = 0;
         int payloadSize = 0;
         while (!_stop)
@@ -242,19 +242,21 @@ namespace lve {
                 continue;
             }
 
-            auto guard = std::lock_guard(_m);
-            if (lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, std::format("currentCameraFrame {}", lastIdTexture + 1)))
             {
-                lastIdTexture++;
-            }
-            else
-            {
-                /*std::fstream file;
-                file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
-                file.write(processStart + currentIndex, imageSize);
-                file.flush();
-                file.close();*/
-                std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
+                auto guard = std::lock_guard(_m);
+                if (lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, std::format("currentCameraFrame {}", lastIdTexture + 1)))
+                {
+                    lastIdTexture++;
+                }
+                else
+                {
+                    /*std::fstream file;
+                    file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
+                    file.write(processStart + currentIndex, imageSize);
+                    file.flush();
+                    file.close();*/
+                    std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
+                }
             }
 
             payloadSize -= startData + nextBoundaryIndex;
