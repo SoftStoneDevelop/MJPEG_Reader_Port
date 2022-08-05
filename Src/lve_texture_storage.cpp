@@ -305,7 +305,7 @@ namespace lve {
         while (true)
         {
             std::unique_lock ul = std::unique_lock(qM);
-            cv.wait(ul);
+            cv.wait(ul, [&]{ return requestDestruct; });
             if (requestDestruct)
             {
                 return;
