@@ -5,16 +5,25 @@
 
 namespace lve {
 
-	LveRenderer::LveRenderer(LveWindow& window, LveDevice& device) : lveWindow{ window }, lveDevice{ device }, currentImageIndex{ 0 }, currentFrameIndex{ 0 }, isFrameStarted{false} {
+	LveRenderer::LveRenderer(LveWindow& window, LveDevice& device) 
+		: 
+		lveWindow{ window },
+		lveDevice{ device },
+		currentImageIndex{ 0 },
+		currentFrameIndex{ 0 },
+		isFrameStarted{false} 
+	{
 		recreateSwapChain();
 		createCommandBuffers();
 	}
 
-	LveRenderer::~LveRenderer() {
+	LveRenderer::~LveRenderer() 
+	{
 		freeCommandBuffers();
 	}
 
-	void LveRenderer::recreateSwapChain() {
+	void LveRenderer::recreateSwapChain() 
+	{
 		auto extent = lveWindow.getExtend();
 		while (extent.width == 0 || extent.height == 0)
 		{
@@ -41,7 +50,8 @@ namespace lve {
 		//we`ll come back to this in just a moment
 	}
 
-	void LveRenderer::createCommandBuffers() {
+	void LveRenderer::createCommandBuffers() 
+	{
 		commandBuffers.resize(LveSwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		VkCommandBufferAllocateInfo allocateInfo{};
@@ -56,7 +66,8 @@ namespace lve {
 		}
 	};
 
-	void LveRenderer::freeCommandBuffers() {
+	void LveRenderer::freeCommandBuffers() 
+	{
 		vkFreeCommandBuffers(
 			lveDevice.device(),
 			lveDevice.getCommandPool(),
@@ -66,7 +77,9 @@ namespace lve {
 		commandBuffers.clear();
 	}
 
-	VkCommandBuffer LveRenderer::beginFrame() {
+	VkCommandBuffer LveRenderer::beginFrame() 
+	{
+		globalFrameCounter++;
 		assert(!isFrameStarted && "Can`t call beginFrame while already in progress");
 
 		auto result = lveSwapChain->acquireNextImage(&currentImageIndex);
@@ -96,7 +109,8 @@ namespace lve {
 		return commandBuffer;
 	}
 
-	void LveRenderer::endFrame() {
+	void LveRenderer::endFrame() 
+	{
 		assert(isFrameStarted && "Can`t call endFrame while frame is not in in progress");
 		auto commandBuffer = getCurrentCommandBuffer();
 
@@ -121,7 +135,8 @@ namespace lve {
 		currentFrameIndex = (currentFrameIndex + 1) % LveSwapChain::MAX_FRAMES_IN_FLIGHT;
 	}
 
-	void LveRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer) {
+	void LveRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer) 
+	{
 		assert(isFrameStarted && "Can`t call beginSwapChainRenderPass while frame is not in in progress");
 		assert(commandBuffer == getCurrentCommandBuffer() && "Can`t begin render pass on command buffer from a different frame");
 
@@ -153,7 +168,8 @@ namespace lve {
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 	}
 
-	void LveRenderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer) {
+	void LveRenderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer) 
+	{
 		assert(isFrameStarted && "Can`t call endSwapChainRenderPass while frame is not in in progress");
 		assert(commandBuffer == getCurrentCommandBuffer() && "Can`t end render pass on command buffer from a different frame");
 

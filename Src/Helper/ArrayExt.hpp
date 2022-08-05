@@ -40,5 +40,7 @@ namespace ArrayExt
                 }
             }
         }
+
+        return index;
     }
 }

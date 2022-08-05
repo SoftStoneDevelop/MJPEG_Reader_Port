@@ -4,6 +4,7 @@
 #include <mutex>
 #include <stdlib.h>
 #include <stdio.h>
+#include <cassert>
 
 namespace ClientMJPEG
 {
@@ -195,6 +196,7 @@ namespace ClientMJPEG
 				break;
 			}
 
+			assert(_readBuffer != nullptr && "_readBuffer is nullptr");
 			auto recived = recv(_connectSocket, _readBuffer, _readBufferSize, 0);
 			if (recived == 0 || recived < 0)
 			{

@@ -17,11 +17,14 @@
 namespace lve {
 
     LveTextureStorage::LveTextureStorage(
-        LveDevice& device)
-        : lveDevice{ device } 
+        LveDevice& device,
+        std::shared_ptr<LveRenderer> renderer
+    )
+        : lveDevice{ device }, lveRenderer{std::move(renderer)}
     {
         texturePool = LveDescriptorPool::Builder(lveDevice)
             .setMaxSets(3000)
+            .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
             .build();
 
@@ -29,14 +32,26 @@ namespace lve {
             .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build()
             ;
+
+        unloadThread = std::thread(&LveTextureStorage::unloadRoutine, this);
     }
 
     LveTextureStorage::~LveTextureStorage()
     {
+        requestDestruct = true;
         for (auto& kv : textureDatas)
         {
             auto& textureData = kv.second;
             destroyAndFreeTextureData(textureData);
+        }
+
+        cv.notify_all();
+        unloadThread.join();
+        while (!unloadQueue.empty())
+        {
+            auto& item = unloadQueue.front();
+            destroyAndFreeTextureData(item);
+            unloadQueue.pop();
         }
 
         for (auto& kv : textureSamplers)
@@ -229,13 +244,19 @@ namespace lve {
         return true;
     }
 
-    void LveTextureStorage::unloadTexture(const std::string& textureName) {
-
+    void LveTextureStorage::unloadTexture(const std::string& textureName) 
+    {
         if (textureDatas.count(textureName) == 0)
             return;
 
         auto& textureData = textureDatas.at(textureName);
-        destroyAndFreeTextureData(textureData);
+        textureData.unloadAskFrame = lveRenderer->getCurrentFrameCount();
+        {
+            std::lock_guard lg = std::lock_guard(qM);
+            unloadQueue.emplace(std::move(textureData));
+        }
+        cv.notify_all();
+
         textureDatas.erase(textureName);
     }
 
@@ -277,6 +298,37 @@ namespace lve {
     bool LveTextureStorage::ContainTexture(const std::string& textureName)
     {
         return textureDatas.count(textureName) != 0;
+    }
+
+    void LveTextureStorage::unloadRoutine()
+    {
+        while (true)
+        {
+            std::unique_lock ul = std::unique_lock(qM);
+            cv.wait(ul);
+            if (requestDestruct)
+            {
+                return;
+            }
+
+            while (!requestDestruct && !unloadQueue.empty())
+            {
+                auto currentFrame = lveRenderer->getCurrentFrameCount();
+                auto& item = unloadQueue.front();
+                if (item.unloadAskFrame < currentFrame - LveSwapChain::MAX_FRAMES_IN_FLIGHT)
+                {
+                    destroyAndFreeTextureData(item);
+                    unloadQueue.pop();
+                }
+                else
+                {
+                    using namespace std::literals::chrono_literals;
+                    ul.unlock();
+                    std::this_thread::sleep_for(1s);
+                    ul.lock();
+                }
+            }
+        }
     }
 
 }//namespace lve

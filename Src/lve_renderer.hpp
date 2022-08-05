@@ -8,9 +8,10 @@
 #include <vector>
 #include <cassert>
 
-namespace lve {
-
-	class LveRenderer {
+namespace lve 
+{
+	class LveRenderer 
+	{
 
 	public:
 
@@ -24,14 +25,22 @@ namespace lve {
 		float getAspectRation() const { return lveSwapChain->extentAspectRatio(); };
 		bool isFrameInProgress() const { return isFrameStarted; };
 
-		VkCommandBuffer getCurrentCommandBuffer() const {
+		VkCommandBuffer getCurrentCommandBuffer() const 
+		{
 			assert(isFrameStarted && "Cannot get command buffer when frame not in progress");
 			return commandBuffers[currentFrameIndex];
 		}
 
-		int getFrameIndex() const { 
+		int getFrameIndex() const 
+		{ 
 			assert(isFrameStarted && "Cannot get frame index when frame not in progress");
 			return currentFrameIndex;
+		}
+
+		/// <returns>Last frame count or current builded frame, if frame in started</returns>
+		int getCurrentFrameCount() const noexcept
+		{
+			return globalFrameCounter.load();
 		}
 
 		VkCommandBuffer beginFrame();
@@ -52,6 +61,7 @@ namespace lve {
 
 		uint32_t currentImageIndex;
 		int currentFrameIndex;
+		std::atomic<int> globalFrameCounter;
 
 		bool isFrameStarted;
 	};

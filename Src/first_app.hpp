@@ -31,13 +31,13 @@ namespace lve {
 		
 		LveWindow lveWindow{ WIDTH, HEIGHT, "MJPEG Viewer" };
 		LveDevice lveDevice{ lveWindow };
-		LveTextureStorage lveTextureStorage{ lveDevice };
-		LveRenderer lveRenderer{ lveWindow, lveDevice };
+		std::shared_ptr<LveRenderer> lveRenderer = std::make_shared<LveRenderer>(lveWindow, lveDevice);
+		LveTextureStorage lveTextureStorage{ lveDevice, lveRenderer };
 
 		// note: order of declarations matters
 		std::unique_ptr<LveDescriptorPool> imGuiPool{};
 		std::thread readCameraThread;
-		volatile int lastIdTexture = 0;
+		std::atomic<int> cameraIndex = 0;
 		volatile bool _stop = false;
 
 		std::mutex _m;

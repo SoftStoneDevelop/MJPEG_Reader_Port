@@ -5,21 +5,28 @@
 
 #include <string>
 #include <unordered_map>
+#include <queue>
+#include <mutex>
+#include "lve_renderer.hpp"
 
-namespace lve {
+namespace lve 
+{
 	
-	class LveTextureStorage {
+	class LveTextureStorage 
+	{
 	public:
-		struct TextureData {
+		struct TextureData 
+		{
 			VkImage image;
 			VkImageView imageView;
 			VkDeviceMemory imageMemory;
 			int texWidth; 
 			int texHeight;
 			std::unordered_map<std::string, VkDescriptorSet> textureDescriptors;
+			int unloadAskFrame;
 		};
 
-		LveTextureStorage(LveDevice& device);
+		LveTextureStorage(LveDevice& device, std::shared_ptr<LveRenderer> renderer);
 		~LveTextureStorage();
 
 		LveTextureStorage(const LveTextureStorage&) = delete;
@@ -43,6 +50,7 @@ namespace lve {
 	private:
 		void createTextureImage(LveTextureStorage::TextureData& imageData, char* pixels);
 		void destroyAndFreeTextureData(const TextureData& data);
+		void unloadRoutine();
 
 		VkSampler getSampler(const std::string& samplerName);
 
@@ -52,5 +60,13 @@ namespace lve {
 		LveDevice& lveDevice;
 		std::unique_ptr<LveDescriptorPool> texturePool;
 		std::unique_ptr<LveDescriptorSetLayout> textureSetLayout;
+
+		std::shared_ptr<LveRenderer> lveRenderer;
+
+		std::thread unloadThread;
+		std::queue<TextureData> unloadQueue;
+		std::mutex qM;
+		std::condition_variable cv;
+		volatile bool requestDestruct = false;
 	};
 } // namespace lve

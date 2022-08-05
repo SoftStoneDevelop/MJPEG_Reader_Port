@@ -12,9 +12,10 @@
 #include "Definitions/DefaultSamplersNames.hpp"
 #include <fstream>
 
-namespace lve {
-
-	FirstApp::FirstApp() {
+namespace lve 
+{
+    FirstApp::FirstApp() 
+    {
 		imGuiPool = LveDescriptorPool::Builder(lveDevice)
 			.setMaxSets(LveSwapChain::MAX_FRAMES_IN_FLIGHT)
 			.setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
@@ -31,7 +32,7 @@ namespace lve {
 			.addPoolSize(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, LveSwapChain::MAX_FRAMES_IN_FLIGHT)
 			.build();
 
-		InitializeImGui(lveWindow, lveDevice, lveRenderer.getSwapChainRenderPass(), imGuiPool->getDescriptorPool(), LveSwapChain::MAX_FRAMES_IN_FLIGHT);
+		InitializeImGui(lveWindow, lveDevice, lveRenderer->getSwapChainRenderPass(), imGuiPool->getDescriptorPool(), LveSwapChain::MAX_FRAMES_IN_FLIGHT);
 	}
 
 	FirstApp::~FirstApp() 
@@ -45,15 +46,15 @@ namespace lve {
 
 	void FirstApp::readImageStream()
 	{
+        auto pool = ArrayPool::ArrayPool<char>();
         ClientMJPEG::HttpClient client("31.160.161.51", 8081);
         std::string error;
         client.Connect(&error);
         client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
 
-        auto pool = ArrayPool::ArrayPool<char>();
         std::string boundaryMark = "boundary=";
 
-
+        auto textureCameraName = std::format("currentCamera{}Frame", ++cameraIndex);
 
         int readBufferSize = 4000;
         int realSize;
@@ -114,7 +115,7 @@ namespace lve {
             readAsync = client.ReadAsync(readBuffer, readBufferSize);
         }
 
-        char boundary[72];
+        char boundary[72]{};
         boundary[0] = '-';
         boundary[1] = '-';
         int boundarySize = 2;
@@ -254,17 +255,9 @@ namespace lve {
 
             {
                 auto guard = std::lock_guard(_m);
-                if (lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, std::format("currentCameraFrame {}", lastIdTexture + 1)))
+                lveTextureStorage.unloadTexture(textureCameraName);
+                if (!lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, textureCameraName))
                 {
-                    lastIdTexture++;
-                }
-                else
-                {
-                    /*std::fstream file;
-                    file.open(std::format("test{}.jpg", lastIdTexture + 1), std::ios::app | std::ios::binary);
-                    file.write(processStart + currentIndex, imageSize);
-                    file.flush();
-                    file.close();*/
                     std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
                 }
             }
@@ -281,17 +274,20 @@ namespace lve {
         pool.Return(boundary);
 	}
 
-	void FirstApp::run() {
+	void FirstApp::run() 
+    {
 		readCameraThread = std::thread(&FirstApp::readImageStream, this);
+
+        auto textureCameraName = std::format("currentCamera{}Frame", 1);
 		while (!lveWindow.shouldClose()) 
         {
 			glfwPollEvents();
-			if (auto commandBuffer = lveRenderer.beginFrame())
+			if (auto commandBuffer = lveRenderer->beginFrame())
 			{
-				int frameIndex = lveRenderer.getFrameIndex();
+				int frameIndex = lveRenderer->getFrameIndex();
 
 				//render
-				lveRenderer.beginSwapChainRenderPass(commandBuffer);
+				lveRenderer->beginSwapChainRenderPass(commandBuffer);
 
 				//order here matters
 				ImGuiNewFrame();
@@ -307,12 +303,10 @@ namespace lve {
                 ImGui::Begin("Viewer");
                 {
                     auto lock = std::lock_guard(_m);
-                    int id = lastIdTexture;
-                    auto name = std::format("currentCameraFrame {}", id);
-                    if (lveTextureStorage.ContainTexture(name))
+                    if (lveTextureStorage.ContainTexture(textureCameraName))
                     {
-                        auto tData = lveTextureStorage.getTextureData(name);
-                        auto info = lveTextureStorage.getDescriptorSet(name, defaultSamplerName);
+                        auto& tData = lveTextureStorage.getTextureData(textureCameraName);
+                        auto info = lveTextureStorage.getDescriptorSet(textureCameraName, defaultSamplerName);
                         ImGui::Image(info, { (float)tData.texWidth, (float)tData.texHeight });
                     }
 
@@ -321,8 +315,8 @@ namespace lve {
                 ImGui::End();
 				ImGuiRender(commandBuffer);
 
-				lveRenderer.endSwapChainRenderPass(commandBuffer);
-				lveRenderer.endFrame();
+				lveRenderer->endSwapChainRenderPass(commandBuffer);
+				lveRenderer->endFrame();
 			}
 		}
 
