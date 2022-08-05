@@ -47,7 +47,7 @@ namespace lve
 	void FirstApp::readImageStream()
 	{
         auto pool = ArrayPool::ArrayPool<char>();
-        ClientMJPEG::HttpClient client("109.236.111.203", 80);
+        ClientMJPEG::HttpClient client("201.174.12.243", 1024);
         std::string error;
         client.Connect(&error);
         client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
@@ -115,10 +115,8 @@ namespace lve
             readAsync = client.ReadAsync(readBuffer, readBufferSize);
         }
 
-        char boundary[72]{};
-        boundary[0] = '-';
-        boundary[1] = '-';
-        int boundarySize = 2;
+        char boundary[70]{};
+        int boundarySize = 0;
         int payloadSize = 0;
         while (!_stop)
         {
