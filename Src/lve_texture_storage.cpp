@@ -305,7 +305,7 @@ namespace lve {
         while (true)
         {
             std::unique_lock ul = std::unique_lock(qM);
-            cv.wait(ul, [&]{ return requestDestruct; });
+            cv.wait(ul);
             if (requestDestruct)
             {
                 return;
@@ -327,6 +327,11 @@ namespace lve {
                     std::this_thread::sleep_for(1s);
                     ul.lock();
                 }
+            }
+
+            if (requestDestruct)
+            {
+                return;
             }
         }
     }
