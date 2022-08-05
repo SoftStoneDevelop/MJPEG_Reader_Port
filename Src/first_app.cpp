@@ -47,7 +47,7 @@ namespace lve
 	void FirstApp::readImageStream()
 	{
         auto pool = ArrayPool::ArrayPool<char>();
-        ClientMJPEG::HttpClient client("31.160.161.51", 8081);
+        ClientMJPEG::HttpClient client("109.236.111.203", 80);
         std::string error;
         client.Connect(&error);
         client.SendRequestGetOnStream("/mjpg/video.mjpg", &error);
@@ -279,9 +279,22 @@ namespace lve
 		readCameraThread = std::thread(&FirstApp::readImageStream, this);
 
         auto textureCameraName = std::format("currentCamera{}Frame", 1);
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
 		while (!lveWindow.shouldClose()) 
         {
 			glfwPollEvents();
+
+            auto newTime = std::chrono::high_resolution_clock::now();
+            long frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
+            currentTime = newTime;
+
+            if (frameTime < 33)
+            {
+                //std::cout << "Frame time:{} milleseconds" << frameTime << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(33 - frameTime));
+            }
+
 			if (auto commandBuffer = lveRenderer->beginFrame())
 			{
 				int frameIndex = lveRenderer->getFrameIndex();
