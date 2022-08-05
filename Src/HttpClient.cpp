@@ -208,7 +208,6 @@ namespace ClientMJPEG
 
 			_isReading = false;
 			_readBuffer = nullptr;
-			lock.unlock();
 			_promise.set_value(recived);
 		}
 	}
