@@ -12,6 +12,7 @@
 #include "Definitions/DefaultSamplersNames.hpp"
 #include <fstream>
 #include <format>
+#include "Helper/VulkanHelpers.hpp"
 
 namespace lve 
 {

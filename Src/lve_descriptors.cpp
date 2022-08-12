@@ -1,8 +1,10 @@
+#pragma once
 #include "lve_descriptors.hpp"
 
 // std
 #include <cassert>
 #include <stdexcept>
+#include <Helper/VulkanHelpers.hpp>
 
 namespace lve {
 
@@ -42,12 +44,14 @@ namespace lve {
         descriptorSetLayoutInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
         descriptorSetLayoutInfo.pBindings = setLayoutBindings.data();
 
-        if (vkCreateDescriptorSetLayout(
+        auto result = vkCreateDescriptorSetLayout(
             lveDevice.device(),
             &descriptorSetLayoutInfo,
             nullptr,
-            &descriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout!");
+            &descriptorSetLayout);
+        if (result != VK_SUCCESS) 
+        {
+            throw std::runtime_error("failed to create descriptor set layout!" + VulkanHelpers::AsString(result));
         }
     }
 
@@ -92,9 +96,10 @@ namespace lve {
         descriptorPoolInfo.maxSets = maxSets;
         descriptorPoolInfo.flags = poolFlags;
 
-        if (vkCreateDescriptorPool(lveDevice.device(), &descriptorPoolInfo, nullptr, &descriptorPool) !=
-            VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor pool!");
+        auto result = vkCreateDescriptorPool(lveDevice.device(), &descriptorPoolInfo, nullptr, &descriptorPool);
+        if (result != VK_SUCCESS) 
+        {
+            throw std::runtime_error("failed to create descriptor pool!" + VulkanHelpers::AsString(result));
         }
     }
 
@@ -103,7 +108,10 @@ namespace lve {
     }
 
     bool LveDescriptorPool::allocateDescriptor(
-        const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet& descriptor) const {
+        const VkDescriptorSetLayout descriptorSetLayout,
+        VkDescriptorSet& descriptor
+    ) const 
+    {
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = descriptorPool;
@@ -112,7 +120,9 @@ namespace lve {
 
         // Might want to create a "DescriptorPoolManager" class that handles this case, and builds
         // a new pool whenever an old pool fills up. But this is beyond our current scope
-        if (vkAllocateDescriptorSets(lveDevice.device(), &allocInfo, &descriptor) != VK_SUCCESS) {
+        auto result = vkAllocateDescriptorSets(lveDevice.device(), &allocInfo, &descriptor);
+        if (result != VK_SUCCESS)
+        {
             return false;
         }
         return true;
@@ -136,10 +146,16 @@ namespace lve {
     // *************** Descriptor Writer *********************
 
     LveDescriptorWriter::LveDescriptorWriter(LveDescriptorSetLayout& setLayout, LveDescriptorPool& pool)
-        : setLayout{ setLayout }, pool{ pool } {}
+        : setLayout{ setLayout }, pool{ pool } 
+    {
+
+    }
 
     LveDescriptorWriter& LveDescriptorWriter::writeBuffer(
-        uint32_t binding, VkDescriptorBufferInfo* bufferInfo) {
+        uint32_t binding,
+        VkDescriptorBufferInfo* bufferInfo
+    )
+    {
         assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
 
         auto& bindingDescription = setLayout.bindings[binding];
@@ -160,7 +176,10 @@ namespace lve {
     }
 
     LveDescriptorWriter& LveDescriptorWriter::writeImage(
-        uint32_t binding, VkDescriptorImageInfo* imageInfo) {
+        uint32_t binding,
+        VkDescriptorImageInfo* imageInfo
+    ) 
+    {
         assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
 
         auto& bindingDescription = setLayout.bindings[binding];
@@ -180,17 +199,21 @@ namespace lve {
         return *this;
     }
 
-    bool LveDescriptorWriter::build(VkDescriptorSet& set) {
+    bool LveDescriptorWriter::build(VkDescriptorSet& set) 
+    {
         bool success = pool.allocateDescriptor(setLayout.getDescriptorSetLayout(), set);
-        if (!success) {
+        if (!success) 
+        {
             return false;
         }
         overwrite(set);
         return true;
     }
 
-    void LveDescriptorWriter::overwrite(VkDescriptorSet& set) {
-        for (auto& write : writes) {
+    void LveDescriptorWriter::overwrite(VkDescriptorSet& set) 
+    {
+        for (auto& write : writes) 
+        {
             write.dstSet = set;
         }
         vkUpdateDescriptorSets(pool.lveDevice.device(), writes.size(), writes.data(), 0, nullptr);

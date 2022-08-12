@@ -1,3 +1,4 @@
+#pragma once
 #include "lve_swap_chain.hpp"
 
 // std
@@ -8,6 +9,7 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
+#include <Helper/VulkanHelpers.hpp>
 
 namespace lve 
 {
@@ -128,9 +130,10 @@ namespace lve
         submitInfo.pSignalSemaphores = signalSemaphores;
 
         vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
-        if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) 
+        auto rSubmit = vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]);
+        if (rSubmit != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to submit draw command buffer!");
+            throw std::runtime_error("failed to submit draw command buffer!" + VulkanHelpers::AsString(rSubmit));
         }
 
         VkPresentInfoKHR presentInfo = {};
@@ -203,9 +206,10 @@ namespace lve
 
         createInfo.oldSwapchain = oldSwapChain == nullptr ? VK_NULL_HANDLE : oldSwapChain->swapChain;
 
-        if (vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) 
+        auto result = vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapChain);
+        if (result != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to create swap chain!");
+            throw std::runtime_error("failed to create swap chain!" + VulkanHelpers::AsString(result));
         }
 
         // we only specified a minimum number of images in the swap chain, so the implementation is
@@ -286,9 +290,10 @@ namespace lve
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
 
-        if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) 
+        auto result = vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass);
+        if (result != VK_SUCCESS) 
         {
-            throw std::runtime_error("failed to create render pass!");
+            throw std::runtime_error("failed to create render pass!" + VulkanHelpers::AsString(result));
         }
     }
 
@@ -309,14 +314,15 @@ namespace lve
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;
 
-            if (vkCreateFramebuffer(
+            auto result = vkCreateFramebuffer(
                 device.device(),
                 &framebufferInfo,
                 nullptr,
-                &swapChainFramebuffers[i]) != VK_SUCCESS
-                ) 
+                &swapChainFramebuffers[i]
+            );
+            if (result != VK_SUCCESS) 
             {
-                throw std::runtime_error("failed to create framebuffer!");
+                throw std::runtime_error("failed to create framebuffer!" + VulkanHelpers::AsString(result));
             }
         }
     }
@@ -367,9 +373,10 @@ namespace lve
             viewInfo.subresourceRange.baseArrayLayer = 0;
             viewInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(device.device(), &viewInfo, nullptr, &depthImageViews[i]) != VK_SUCCESS)
+            auto result = vkCreateImageView(device.device(), &viewInfo, nullptr, &depthImageViews[i]);
+            if (result != VK_SUCCESS)
             {
-                throw std::runtime_error("failed to create texture image view!");
+                throw std::runtime_error("failed to create texture image view!" + VulkanHelpers::AsString(result));
             }
         }
     }

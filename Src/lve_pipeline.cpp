@@ -1,9 +1,11 @@
+#pragma once
 #include "lve_pipeline.hpp"
 
 #include <cassert>
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
+#include <Helper/VulkanHelpers.hpp>
 
 namespace lve {
 
@@ -104,23 +106,25 @@ namespace lve {
 		pipelineInfo.basePipelineIndex = -1;
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-		if (vkCreateGraphicsPipelines(
+		auto result = vkCreateGraphicsPipelines(
 			lveDevice.device(),
 			VK_NULL_HANDLE,
 			1,
 			&pipelineInfo,
 			nullptr,
 			&graphicsPipeline
-		) != VK_SUCCESS)
+		);
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to create graphics pipelien");
+			throw std::runtime_error("failed to create graphics pipelien" + VulkanHelpers::AsString(result));
 		}
 
 		vkDestroyShaderModule(lveDevice.device(), vertShaderModule, nullptr);
 		vkDestroyShaderModule(lveDevice.device(), fragShaderModule, nullptr);
 	}
 
-	VkShaderModule LvePipeline::createShaderModule(const std::vector<char>& code) {
+	VkShaderModule LvePipeline::createShaderModule(const std::vector<char>& code) 
+	{
 
 		VkShaderModule shaderModule{};
 		VkShaderModuleCreateInfo createInfo{};
@@ -128,15 +132,17 @@ namespace lve {
 		createInfo.codeSize = code.size();
 		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-		if (vkCreateShaderModule(lveDevice.device(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+		auto result = vkCreateShaderModule(lveDevice.device(), &createInfo, nullptr, &shaderModule);
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to create shader module!");
+			throw std::runtime_error("failed to create shader module!" + VulkanHelpers::AsString(result));
 		}
 
 		return shaderModule;
 	}
 
-	void LvePipeline::bind(VkCommandBuffer commandBuffer) {
+	void LvePipeline::bind(VkCommandBuffer commandBuffer) 
+	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 	}
 

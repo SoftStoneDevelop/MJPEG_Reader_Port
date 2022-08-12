@@ -1,7 +1,9 @@
+#pragma once
 #include "lve_renderer.hpp"
 
 #include <stdexcept>
 #include <array>
+#include <Helper/VulkanHelpers.hpp>
 
 namespace lve {
 
@@ -60,9 +62,10 @@ namespace lve {
 		allocateInfo.commandPool = lveDevice.getCommandPool();
 		allocateInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
-		if (vkAllocateCommandBuffers(lveDevice.device(), &allocateInfo, commandBuffers.data()) != VK_SUCCESS)
+		auto result = vkAllocateCommandBuffers(lveDevice.device(), &allocateInfo, commandBuffers.data());
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to allocate command buffers!");
+			throw std::runtime_error("failed to allocate command buffers!" + VulkanHelpers::AsString(result));
 		}
 	};
 
@@ -92,7 +95,7 @@ namespace lve {
 
 		if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 		{
-			throw std::runtime_error("failed to acquire swap chain image!");
+			throw std::runtime_error("failed to acquire swap chain image!" + VulkanHelpers::AsString(result));
 		}
 
 		isFrameStarted = true;
@@ -101,9 +104,10 @@ namespace lve {
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+		result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to begin recording command buffer!");
+			throw std::runtime_error("failed to begin recording command buffer!" + VulkanHelpers::AsString(result));
 		}
 
 		return commandBuffer;
@@ -114,12 +118,13 @@ namespace lve {
 		assert(isFrameStarted && "Can`t call endFrame while frame is not in in progress");
 		auto commandBuffer = getCurrentCommandBuffer();
 
-		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+		auto result = vkEndCommandBuffer(commandBuffer);
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to record command buffer!");
+			throw std::runtime_error("failed to record command buffer!" + VulkanHelpers::AsString(result));
 		}
 
-		auto result = lveSwapChain->submitCommandBuffers(&commandBuffer, &currentImageIndex);
+		result = lveSwapChain->submitCommandBuffers(&commandBuffer, &currentImageIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || lveWindow.wasWindowResized())
 		{
@@ -128,7 +133,7 @@ namespace lve {
 		}
 		else if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to present swap chain image!");
+			throw std::runtime_error("failed to present swap chain image!" + VulkanHelpers::AsString(result));
 		}
 
 		isFrameStarted = false;

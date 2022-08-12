@@ -1,6 +1,8 @@
+#pragma once
 #include "lve_window.hpp"
 
 #include <stdexcept>
+#include <Helper/VulkanHelpers.hpp>
 
 namespace lve {
 
@@ -23,10 +25,12 @@ namespace lve {
 		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 	}
 
-	void LveWindow::createWindowSurface(VkInstance instance, VkSurfaceKHR* surface) {
-		if (glfwCreateWindowSurface(instance, window, nullptr, surface) != VK_SUCCESS)
+	void LveWindow::createWindowSurface(VkInstance instance, VkSurfaceKHR* surface) 
+	{
+		auto result = glfwCreateWindowSurface(instance, window, nullptr, surface);
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("faile to create window surface!");
+			throw std::runtime_error("faile to create window surface!" + VulkanHelpers::AsString(result));
 		}
 	}
 

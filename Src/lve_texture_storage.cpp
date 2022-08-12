@@ -13,6 +13,7 @@
 #ifndef ENGINE_DIR
 #define ENGINE_DIR "../../../" 
 #endif // !ENGINE_DIR
+#include <Helper/VulkanHelpers.hpp>
 
 namespace lve {
 
@@ -126,8 +127,10 @@ namespace lve {
     )
     {
         VkSampler textureSampler{};
-        if (vkCreateSampler(lveDevice.device(), &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create texture sampler!");
+        auto result = vkCreateSampler(lveDevice.device(), &samplerInfo, nullptr, &textureSampler);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create texture sampler!" + VulkanHelpers::AsString(result));
         }
 
         assert(textureSamplers.count(samplerName) == 0 && "Sampler already in use");
