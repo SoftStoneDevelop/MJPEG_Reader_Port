@@ -145,8 +145,8 @@ namespace lve
                     else
                     {
                         std::shift_left(readBuffer + i, readBuffer + readSize, readBufferSize - i);
-                        readAsync = client.ReadAsync(readBuffer + i, readBufferSize - i);
-                        payloadSize = i;
+                        readAsync = client.ReadAsync(readBuffer + readSize - i, readBufferSize - readSize - i);
+                        payloadSize = readSize - i;
                     }
 
                     break;
