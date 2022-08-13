@@ -190,6 +190,11 @@ namespace lve {
             mipLevels
         );
 
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = static_cast<float>(mipLevels);
+        samplerInfo.mipLodBias = 0.0f;
+
         imageData.sampler = createTextureSampler(samplerInfo);
 
         assert(textureDatas.count(textureName) == 0 && "Texture already in use");
