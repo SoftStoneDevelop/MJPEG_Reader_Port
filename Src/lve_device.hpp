@@ -63,17 +63,31 @@ class LveDevice {
   VkCommandBuffer beginSingleTimeCommands();
   void endSingleTimeCommands(VkCommandBuffer commandBuffer);
   void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-  void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
+  void copyBufferToImage(
+      VkBuffer buffer,
+      VkImage image,
+      uint32_t width,
+      uint32_t height,
+      uint32_t layerCount,
+      uint32_t mipLevel
+  );
 
-  void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
+  void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+  void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 
   void createImageWithInfo(
       const VkImageCreateInfo &imageInfo,
       VkMemoryPropertyFlags properties,
       VkImage &image,
-      VkDeviceMemory &imageMemory);
+      VkDeviceMemory &imageMemory
+  );
 
-  void createImageView(VkImageView& imageView, VkImage& image, VkFormat format);
+  void createImageView(
+      VkImageView& imageView,
+      VkImage& image,
+      VkFormat format,
+      uint32_t mipLevels = 1
+  );
 
   VkPhysicalDeviceProperties properties;
 

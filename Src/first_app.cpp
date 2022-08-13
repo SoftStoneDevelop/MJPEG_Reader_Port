@@ -256,7 +256,22 @@ namespace lve
             {
                 auto guard = std::lock_guard(_m);
                 lveTextureStorage.unloadTexture(textureCameraName);
-                if (!lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, textureCameraName))
+
+                VkSamplerCreateInfo sampler{};
+                sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+                sampler.magFilter = VK_FILTER_LINEAR;
+                sampler.minFilter = VK_FILTER_LINEAR;
+                sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                sampler.anisotropyEnable = VK_TRUE;
+                sampler.maxAnisotropy = lveDevice.properties.limits.maxSamplerAnisotropy;
+                sampler.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+                sampler.unnormalizedCoordinates = VK_FALSE;
+                sampler.compareEnable = VK_FALSE;
+                sampler.compareOp = VK_COMPARE_OP_ALWAYS;
+
+                if (!lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, textureCameraName, sampler))
                 {
                     std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
                 }
