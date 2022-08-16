@@ -28,6 +28,8 @@ namespace lve {
 		void run();
 	private:
 		void readImageStream();
+		bool validatePort(const char* input);
+		bool validateHost(const char* input);
 		
 		LveWindow lveWindow{ WIDTH, HEIGHT, "MJPEG Viewer" };
 		LveDevice lveDevice{ lveWindow };

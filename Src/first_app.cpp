@@ -13,6 +13,7 @@
 #include <fstream>
 #include <format>
 #include "Helper/VulkanHelpers.hpp"
+#include <algorithm>
 
 namespace lve 
 {
@@ -40,7 +41,11 @@ namespace lve
 	FirstApp::~FirstApp() 
 	{
         _stop = true;
-        readCameraThread.join();
+
+        if (readCameraThread.joinable())
+        {
+            readCameraThread.join();
+        }
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
@@ -292,23 +297,29 @@ namespace lve
 	void FirstApp::run() 
     {
 		readCameraThread = std::thread(&FirstApp::readImageStream, this);
+        char host[16];
+        memset(host, 0, sizeof(host));
 
-        auto textureCameraName = std::format("currentCamera{}Frame", 1);
+        char port[5];
+        memset(port, 0, sizeof(port));
+        std::vector<int> cameras;
 
-        auto currentTime = std::chrono::high_resolution_clock::now();
+        //TEST
+        for (int i = 0; i < 10; i++)
+        {
+            cameras.push_back(1);
+        }
+
+        static ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+        flags &= ~ImGuiWindowFlags_NoScrollbar;
+        auto showWindow = true;
+        auto portValide = false;
+        auto hostValide = false;
+
+        auto tempValid = false;
 		while (!lveWindow.shouldClose()) 
         {
 			glfwPollEvents();
-
-            auto newTime = std::chrono::high_resolution_clock::now();
-            long frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
-            currentTime = newTime;
-
-            if (frameTime < 33)
-            {
-                //std::cout << "Frame time:{} milleseconds" << frameTime << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(33 - frameTime));
-            }
 
 			if (auto commandBuffer = lveRenderer->beginFrame())
 			{
@@ -319,28 +330,109 @@ namespace lve
 
 				//order here matters
 				ImGuiNewFrame();
-#ifdef IMGUI_HAS_VIEWPORT
-                ImGuiViewport* viewport = ImGui::GetMainViewport();
-                ImGui::SetNextWindowPos(viewport->GetWorkPos());
-                ImGui::SetNextWindowSize(viewport->GetWorkSize());
-                ImGui::SetNextWindowViewport(viewport->ID);
-#else 
-                ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-                ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-#endif
-                ImGui::Begin("Viewer");
+
+                const ImGuiViewport* viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(viewport->Pos);
+                ImGui::SetNextWindowSize(viewport->Size);
+
+                if (ImGui::Begin("Example: Fullscreen window", &showWindow, flags))
                 {
-                    auto lock = std::lock_guard(_m);
-                    if (lveTextureStorage.ContainTexture(textureCameraName))
+                    if (!hostValide)
                     {
-                        auto& tData = lveTextureStorage.getTextureData(textureCameraName);
-                        auto info = lveTextureStorage.getDescriptorSet(textureCameraName, defaultSamplerName);
-                        ImGui::Image(info, { (float)tData.texWidth, (float)tData.texHeight });
+                        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
+                    }
+                    ImGui::PushItemWidth(100);
+
+                    auto hostChange = ImGui::InputText("##Host", host, sizeof(host));
+                    if (hostChange)
+                    {
+                        tempValid = validateHost(host);
+                    }
+                    ImGui::PopItemWidth();
+                    if (!hostValide)
+                    {
+                        ImGui::PopStyleColor();
                     }
 
-                    ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "Error text place");
+                    if (hostChange)
+                    {
+                        hostValide = tempValid;
+                    }
+                    ImGui::SameLine();
+                    ImGui::Text("Host");
+                    ImGui::SameLine();
+
+                    ImGui::PushItemWidth(50);
+                    if (!portValide)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
+                    }
+
+                    auto portChange = ImGui::InputText("##Port", port, sizeof(port));
+                    if (portChange)
+                    {
+                        tempValid = validatePort(port);
+                    }
+
+                    if (!portValide)
+                    {
+                        ImGui::PopStyleColor();
+                    }
+                    
+                    if (portChange)
+                    {
+                        portValide = tempValid;
+                    }
+                    ImGui::PopItemWidth();
+                    ImGui::SameLine();
+                    ImGui::Text("Port");
+                    ImGui::SameLine();
+                    if (ImGui::Button("Add camera"))
+                    {
+                        //TODO add new thread to vector
+                        cameras.push_back(++cameraIndex);
+                    }
+
+                    auto frameText = 
+                        std::format(
+                            "Application average {:.3f}f ms/frame ({:.1f}f FPS)", 
+                            1000.0f / ImGui::GetIO().Framerate,
+                            ImGui::GetIO().Framerate
+                        );
+                    auto textSize = ImGui::CalcTextSize(frameText.c_str());;
+                    ImGui::BeginListBox("Cameras", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y - ImGui::GetStyle().ItemSpacing.y - textSize.y));
+                    ImGui::PushID("##VerticalScrolling");
+                    for (int i = 0; i < cameras.size(); i++)
+                    {
+                        auto textureCameraName = std::format("currentCamera{}Frame", cameras[i]);
+                        auto lock = std::lock_guard(_m);
+                        if (lveTextureStorage.ContainTexture(textureCameraName))
+                        {
+                            auto& tData = lveTextureStorage.getTextureData(textureCameraName);
+                            auto info = lveTextureStorage.getDescriptorSet(textureCameraName, defaultSamplerName);
+                            auto itemSizeAv = ImGui::GetContentRegionAvail();
+                            ImGui::Image(
+                                info, 
+                                { 
+                                    //TODO Calculate ratio
+                                    itemSizeAv.x >= (float)tData.texWidth ? (float)tData.texWidth : itemSizeAv.x,
+                                    (float)tData.texHeight
+                                }
+                            );
+                        }
+
+                        if (ImGui::Button("Close camera"))
+                        {
+                            //TODO
+                        }
+                    }
+                    ImGui::PopID();
+                    ImGui::EndListBox();
+                    ImGui::Text(frameText.c_str());
+
+                    ImGui::End();
                 }
-                ImGui::End();
+
 				ImGuiRender(commandBuffer);
 
 				lveRenderer->endSwapChainRenderPass(commandBuffer);
@@ -350,4 +442,86 @@ namespace lve
 
 		vkDeviceWaitIdle(lveDevice.device());
 	}
+
+    bool FirstApp::validateHost(const char* input)
+    {
+        int position = 0;
+        char numbers[10] = { '0','1','2','3','4','5','6','7','8','9' };
+        int partIndex = 0;
+
+        int dotCounter = 0;
+        while (input[position] != '\0')
+        {
+            if (partIndex == 1 && input[position - 1] == '0' && input[position] != '.')
+            {
+                return false;
+            }
+
+            if (input[position] == '.')
+            {
+                if (dotCounter > 2)
+                {
+                    return false;
+                }
+
+                dotCounter++;
+                if (partIndex > 0)
+                {
+                    position++;
+                    partIndex = 0;
+                    continue;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (partIndex > 2)
+            {
+                return false;
+            }
+
+            auto number = std::find(numbers, numbers + sizeof(numbers), input[position]);
+            position++;
+            partIndex++;
+            if (number != numbers + sizeof(numbers))
+            {
+                continue;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool FirstApp::validatePort(const char* input)
+    {
+        int position = 0;
+        char numbers[10] = {'0','1','2','3','4','5','6','7','8','9'};
+
+        if (input[position] == '0')
+        {
+            return false;
+        }
+
+        while (input[position] != '\0')
+        {
+            auto number = std::find(numbers, numbers + sizeof(numbers), input[position]);
+            position++;
+            if (number != numbers + sizeof(numbers))
+            {
+                continue;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
