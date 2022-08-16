@@ -285,6 +285,7 @@ namespace lve
                         if (ImGui::Button("Close camera"))
                         {
                             item->stop = true;
+                            item->thread.join();
                             //forget queue item
                         }
                         else
