@@ -22,7 +22,7 @@ namespace ClientMJPEG
 	class HttpClient
 	{
 	public:
-		HttpClient(const std::string& host, const int& port);
+		HttpClient(const std::string& host, const std::string& port);
 		~HttpClient();
 
 		HttpClient(const HttpClient& other) = delete;

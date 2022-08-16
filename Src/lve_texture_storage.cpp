@@ -40,10 +40,12 @@ namespace lve {
     LveTextureStorage::~LveTextureStorage()
     {
         requestDestruct = true;
-        for (auto& kv : textureDatas)
         {
-            auto& textureData = kv.second;
-            destroyAndFreeTextureData(textureData);
+            for (auto& kv : textureDatas)
+            {
+                auto& textureData = kv.second;
+                destroyAndFreeTextureData(textureData);
+            }
         }
 
         cv.notify_all();
@@ -237,6 +239,13 @@ namespace lve {
         assert(textureDatas.count(textureName) == 0 && "Texture already in use");
         textureDatas[textureName] = std::move(imageData);
         return true;
+    }
+
+    void LveTextureStorage::changeName(const std::string& textureName, const std::string& newTetureName)
+    {
+        auto textureData = std::move(textureDatas.at(textureName));
+        textureDatas.erase(textureName);
+        textureDatas.emplace(newTetureName, textureData);
     }
 
     void LveTextureStorage::unloadTexture(const std::string& textureName) 

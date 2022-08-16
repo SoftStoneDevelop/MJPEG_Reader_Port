@@ -10,8 +10,8 @@ namespace ClientMJPEG
 {
 	HttpClient::HttpClient(
 		const std::string& host,
-		const int& port
-	) : _host{ host }, _port{ std::move(std::to_string(port)) }
+		const std::string& port
+	) : _host{ host }, _port{ std::move(port) }
 	{
 
 	}

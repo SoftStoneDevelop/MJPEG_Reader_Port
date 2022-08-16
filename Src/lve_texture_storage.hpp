@@ -44,6 +44,7 @@ namespace lve
 			const std::string& textureName,
 			VkSamplerCreateInfo& samplerInfo
 		);
+		void changeName(const std::string& textureName, const std::string& newTetureName);
 		void unloadTexture(const std::string& textureName);
 
 		VkSampler createTextureSampler(VkSamplerCreateInfo& samplerInfo);
