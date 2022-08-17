@@ -91,7 +91,7 @@ namespace lve
 
             path[i] = '\0';
 
-            temp = "201.174.12.243";
+            temp = "31.133.13.58";
             i = 0;
             while (temp[i] != '\0')
             {
@@ -102,7 +102,7 @@ namespace lve
             host[i] = '\0';
             hostValide = validateHost(port);
 
-            temp = "1024";
+            temp = "8888";
             i = 0;
             while (temp[i] != '\0')
             {
@@ -541,6 +541,7 @@ namespace lve
             sampler.compareEnable = VK_FALSE;
             sampler.compareOp = VK_COMPARE_OP_ALWAYS;
 
+            std::lock_guard lg(m);
             LveTextureStorage::TextureData textureData;
             if (!lveTextureStorage.loadTexture(
                 processStart + startData,
@@ -554,7 +555,6 @@ namespace lve
             }
             else
             {
-                std::lock_guard lg(m);
                 lveTextureStorage.unloadTexture(textureName);
                 lveTextureStorage.storeTexture(textureName, std::move(textureData));
             }

@@ -232,6 +232,12 @@ namespace lve {
         int texChannels;
         auto imagePtr = reinterpret_cast<const stbi_uc*>(image);
         stbi_uc* pixels = stbi_load_from_memory(imagePtr, imageSize, &data->texWidth, &data->texHeight, &texChannels, STBI_rgb_alpha);
+
+        if (pixels == nullptr)
+        {
+            return false;
+        }
+
         if (data->texWidth <= 0 || data->texHeight <= 0)
         {
             return false;

@@ -22,8 +22,8 @@ namespace lve {
 
 	LveRenderer::~LveRenderer() 
 	{
-		vkDestroyCommandPool(lveDevice.device(), commandPool, nullptr);
 		freeCommandBuffers();
+		vkDestroyCommandPool(lveDevice.device(), commandPool, nullptr);
 	}
 
 	void LveRenderer::recreateSwapChain() 
