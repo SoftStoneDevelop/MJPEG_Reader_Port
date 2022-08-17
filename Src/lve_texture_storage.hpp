@@ -35,15 +35,18 @@ namespace lve
 
 		bool loadTexture(
 			const std::string& texturePath,
-			const std::string& textureName,
-			VkSamplerCreateInfo& samplerInfo
+			VkSamplerCreateInfo& samplerInfo,
+			TextureData* data
 		);
+
 		bool loadTexture(
 			const char* image,
 			const int& imageSize,
-			const std::string& textureName,
-			VkSamplerCreateInfo& samplerInfo
+			VkSamplerCreateInfo& samplerInfo,
+			TextureData* data
 		);
+
+		void storeTexture(const std::string& textureName, TextureData&& data);
 		void changeName(const std::string& textureName, const std::string& newTetureName);
 		void unloadTexture(const std::string& textureName);
 

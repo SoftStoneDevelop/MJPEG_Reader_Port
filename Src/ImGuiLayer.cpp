@@ -285,8 +285,10 @@ namespace lve
                         if (ImGui::Button("Close camera"))
                         {
                             item->stop = true;
-                            item->thread.join();
-                            //forget queue item
+                            if (item->thread.joinable())
+                            {
+                                item->thread.join();
+                            }
                         }
                         else
                         {
@@ -326,7 +328,6 @@ namespace lve
 
         const char* boundaryMark = "boundary=";
         auto textureName = std::format("camera{}", camera->CameraNumber);
-        auto textureTempName = std::format("cameraTemp{}", camera->CameraNumber);
 
         int readBufferSize = 4000;
         int realSize;
@@ -523,33 +524,30 @@ namespace lve
                 continue;
             }
 
+            VkSamplerCreateInfo sampler{};
+            sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            sampler.magFilter = VK_FILTER_LINEAR;
+            sampler.minFilter = VK_FILTER_LINEAR;
+            sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            sampler.anisotropyEnable = VK_TRUE;
+            sampler.maxAnisotropy = device.properties.limits.maxSamplerAnisotropy;
+            sampler.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            sampler.unnormalizedCoordinates = VK_FALSE;
+            sampler.compareEnable = VK_FALSE;
+            sampler.compareOp = VK_COMPARE_OP_ALWAYS;
 
+            LveTextureStorage::TextureData textureData;
+            if (!lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, sampler, &textureData))
+            {
+                std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
+            }
+            else
             {
                 std::lock_guard lg(m);
-
-                VkSamplerCreateInfo sampler{};
-                sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-                sampler.magFilter = VK_FILTER_LINEAR;
-                sampler.minFilter = VK_FILTER_LINEAR;
-                sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-                sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-                sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-                sampler.anisotropyEnable = VK_TRUE;
-                sampler.maxAnisotropy = device.properties.limits.maxSamplerAnisotropy;
-                sampler.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-                sampler.unnormalizedCoordinates = VK_FALSE;
-                sampler.compareEnable = VK_FALSE;
-                sampler.compareOp = VK_COMPARE_OP_ALWAYS;
-
-                if (!lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, textureTempName, sampler))
-                {
-                    std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
-                }
-                else
-                {
-                    lveTextureStorage.unloadTexture(textureName);
-                    lveTextureStorage.changeName(textureTempName, textureName);
-                }
+                lveTextureStorage.unloadTexture(textureName);
+                lveTextureStorage.storeTexture(textureName, std::move(textureData));
             }
 
             payloadSize -= startData + nextBoundaryIndex;

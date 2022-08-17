@@ -171,23 +171,27 @@ namespace lve {
 
     bool LveTextureStorage::loadTexture(
         const std::string& texturePath,
-        const std::string& textureName,
-        VkSamplerCreateInfo& samplerInfo
+        VkSamplerCreateInfo& samplerInfo,
+        TextureData* data
     ) 
     {
-        LveTextureStorage::TextureData imageData{};
-        int texChannels;
-        stbi_uc* pixels = stbi_load((ENGINE_DIR + texturePath).c_str(), &imageData.texWidth, &imageData.texHeight, &texChannels, STBI_rgb_alpha);
-        if (imageData.texWidth <= 0 || imageData.texHeight <= 0)
+        if (!data)
         {
             return false;
         }
 
-        uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(imageData.texWidth, imageData.texHeight)))) + 1;
-        createTextureImage(imageData, reinterpret_cast<char*>(pixels), mipLevels);
+        int texChannels;
+        stbi_uc* pixels = stbi_load((ENGINE_DIR + texturePath).c_str(), &data->texWidth, &data->texHeight, &texChannels, STBI_rgb_alpha);
+        if (data->texWidth <= 0 || data->texHeight <= 0)
+        {
+            return false;
+        }
+
+        uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
+        createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels);
         lveDevice.createImageView(
-            imageData.imageView,
-            imageData.image,
+            data->imageView,
+            data->image,
             VK_FORMAT_R8G8B8A8_SRGB,
             mipLevels
         );
@@ -197,34 +201,35 @@ namespace lve {
         samplerInfo.maxLod = static_cast<float>(mipLevels);
         samplerInfo.mipLodBias = 0.0f;
 
-        imageData.sampler = createTextureSampler(samplerInfo);
-
-        assert(textureDatas.count(textureName) == 0 && "Texture already in use");
-        textureDatas[textureName] = std::move(imageData);
+        data->sampler = createTextureSampler(samplerInfo);
         return true;
     }
 
     bool LveTextureStorage::loadTexture(
         const char* image,
         const int& imageSize,
-        const std::string& textureName,
-        VkSamplerCreateInfo& samplerInfo
+        VkSamplerCreateInfo& samplerInfo,
+        TextureData* data
     )
     {
-        LveTextureStorage::TextureData imageData{};
-        int texChannels;
-        auto imagePtr = reinterpret_cast<const stbi_uc*>(image);
-        stbi_uc* pixels = stbi_load_from_memory(imagePtr, imageSize, &imageData.texWidth, &imageData.texHeight, &texChannels, STBI_rgb_alpha);
-        if (imageData.texWidth <= 0 || imageData.texHeight <= 0)
+        if (!data)
         {
             return false;
         }
 
-        uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(imageData.texWidth, imageData.texHeight)))) + 1;
-        createTextureImage(imageData, reinterpret_cast<char*>(pixels), mipLevels);
+        int texChannels;
+        auto imagePtr = reinterpret_cast<const stbi_uc*>(image);
+        stbi_uc* pixels = stbi_load_from_memory(imagePtr, imageSize, &data->texWidth, &data->texHeight, &texChannels, STBI_rgb_alpha);
+        if (data->texWidth <= 0 || data->texHeight <= 0)
+        {
+            return false;
+        }
+
+        uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
+        createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels);
         lveDevice.createImageView(
-            imageData.imageView,
-            imageData.image,
+            data->imageView,
+            data->image,
             VK_FORMAT_R8G8B8A8_SRGB,
             mipLevels
         );
@@ -234,11 +239,14 @@ namespace lve {
         samplerInfo.maxLod = static_cast<float>(mipLevels);
         samplerInfo.mipLodBias = 0.0f;
 
-        imageData.sampler = createTextureSampler(samplerInfo);
-
-        assert(textureDatas.count(textureName) == 0 && "Texture already in use");
-        textureDatas[textureName] = std::move(imageData);
+        data->sampler = createTextureSampler(samplerInfo);
         return true;
+    }
+
+    void LveTextureStorage::storeTexture(const std::string& textureName, TextureData&& data)
+    {
+        assert(textureDatas.count(textureName) == 0 && "Texture already in use");
+        textureDatas[textureName] = std::move(data);
     }
 
     void LveTextureStorage::changeName(const std::string& textureName, const std::string& newTetureName)
