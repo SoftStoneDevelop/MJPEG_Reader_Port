@@ -43,7 +43,7 @@ namespace lve
 		}
 
 		/// <returns>Last frame count or current builded frame, if frame in started</returns>
-		int getCurrentFrameCount() const noexcept
+		long getCurrentFrameCount() const noexcept
 		{
 			return globalFrameCounter.load();
 		}
@@ -67,7 +67,7 @@ namespace lve
 
 		uint32_t currentImageIndex;
 		int currentFrameIndex;
-		std::atomic<int> globalFrameCounter;
+		std::atomic<long> globalFrameCounter;
 
 		bool isFrameStarted;
 	};

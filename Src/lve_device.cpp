@@ -564,14 +564,16 @@ namespace lve
 
         VkFenceCreateInfo fenceInfo = {};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
         VkFence fence;
         vkCreateFence(device_, &fenceInfo, nullptr, &fence);
-        vkResetFences(device_, 1, &fence);
         auto lock = getLockGraphicsQueue();
         lock.lock();
-        vkQueueSubmit(graphicsQueue_, 1, &submitInfo, fence);
+        auto result = vkQueueSubmit(graphicsQueue_, 1, &submitInfo, fence);
+        if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to submit SingleTimeCommand!" + VulkanHelpers::AsString(result));
+        }
         lock.unlock();
         vkWaitForFences(device_, 1, &fence, VK_TRUE, UINT64_MAX);
         vkDestroyFence(device_, fence, nullptr);
