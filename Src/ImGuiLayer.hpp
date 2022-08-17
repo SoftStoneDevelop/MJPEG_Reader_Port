@@ -22,7 +22,8 @@ namespace lve
             LveDevice& device,
             VkRenderPass renderPass,
             uint32_t imageCount,
-            LveTextureStorage& lveTextureStorage
+            LveTextureStorage& lveTextureStorage,
+            VkCommandPool commandPool
         );
         ~ImGuiLayer();
         void Draw(VkCommandBuffer commandBuffer, LveTextureStorage& lveTextureStorage);

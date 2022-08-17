@@ -104,7 +104,8 @@ namespace lve {
     void LveTextureStorage::createTextureImage(
         LveTextureStorage::TextureData& imageData,
         char* pixels,
-        uint32_t mipLevels
+        uint32_t mipLevels,
+        VkCommandPool commandPool
     )
     {
         //TODO not always generate Mipmaps, add parametr to method needGenerateMipmap
@@ -154,7 +155,8 @@ namespace lve {
             imageData.image,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            mipLevels
+            mipLevels,
+            commandPool
         );
 
         lveDevice.copyBufferToImage(
@@ -163,16 +165,25 @@ namespace lve {
             static_cast<uint32_t>(imageData.texWidth),
             static_cast<uint32_t>(imageData.texHeight),
             1,
-            0//original image
+            0,//original image
+            commandPool
         );
 
-        lveDevice.generateMipmaps(imageData.image, VK_FORMAT_R8G8B8A8_SRGB, imageData.texWidth, imageData.texHeight, mipLevels);
+        lveDevice.generateMipmaps(
+            imageData.image,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            imageData.texWidth, 
+            imageData.texHeight,
+            mipLevels,
+            commandPool
+        );
     }
 
     bool LveTextureStorage::loadTexture(
         const std::string& texturePath,
         VkSamplerCreateInfo& samplerInfo,
-        TextureData* data
+        TextureData* data,
+        VkCommandPool commandPool
     ) 
     {
         if (!data)
@@ -188,7 +199,7 @@ namespace lve {
         }
 
         uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
-        createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels);
+        createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels, commandPool);
         lveDevice.createImageView(
             data->imageView,
             data->image,
@@ -209,7 +220,8 @@ namespace lve {
         const char* image,
         const int& imageSize,
         VkSamplerCreateInfo& samplerInfo,
-        TextureData* data
+        TextureData* data,
+        VkCommandPool commandPool
     )
     {
         if (!data)
@@ -226,7 +238,7 @@ namespace lve {
         }
 
         uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
-        createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels);
+        createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels, commandPool);
         lveDevice.createImageView(
             data->imageView,
             data->image,
@@ -274,10 +286,13 @@ namespace lve {
 
     void LveTextureStorage::destroyAndFreeTextureData(const TextureData& data) 
     {
-        for (auto i = data.textureDescriptors.begin(); i != data.textureDescriptors.end(); i++)
         {
-            auto& item = *i;
-            texturePool->freeDescriptors(&item.second, 1);
+            std::lock_guard lg(texturePoolM);
+            for (auto i = data.textureDescriptors.begin(); i != data.textureDescriptors.end(); i++)
+            {
+                auto& item = *i;
+                texturePool->freeDescriptors(&item.second, 1);
+            }
         }
 
         vkDestroySampler(lveDevice.device(), data.sampler, nullptr);
@@ -300,9 +315,13 @@ namespace lve {
 
         auto descriptorImage = descriptorInfo(textureName);
         VkDescriptorSet descriptorSet{};
-        LveDescriptorWriter(*textureSetLayout, *texturePool)
-            .writeImage(0, &descriptorImage)
-            .build(descriptorSet);
+
+        {
+            std::lock_guard lg(texturePoolM);
+            LveDescriptorWriter(*textureSetLayout, *texturePool)
+                .writeImage(0, &descriptorImage)
+                .build(descriptorSet);
+        }
 
         textureData.textureDescriptors[samplerName] = descriptorSet;
         return descriptorSet;

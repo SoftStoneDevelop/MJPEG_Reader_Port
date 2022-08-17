@@ -10,6 +10,7 @@
 #include <format>
 #include "Helper/VulkanHelpers.hpp"
 #include <imgui_internal.h>
+#include "Helper/VulkanExtensions.hpp"
 
 namespace lve
 {
@@ -18,7 +19,8 @@ namespace lve
 		LveDevice& lveDevice,
 		VkRenderPass renderPass,
 		uint32_t imageCount,
-        LveTextureStorage& textureStorage
+        LveTextureStorage& textureStorage,
+        VkCommandPool commandPool
     ) 
         : device{ lveDevice },
         lveTextureStorage{ textureStorage },
@@ -65,9 +67,9 @@ namespace lve
         init_info.CheckVkResultFn = nullptr;
         ImGui_ImplVulkan_Init(&init_info, renderPass);
 
-        auto commandBuffer = device.beginSingleTimeCommands();
+        auto commandBuffer = device.beginSingleTimeCommands(commandPool);
         ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-        device.endSingleTimeCommands(commandBuffer);
+        device.endSingleTimeCommands(commandBuffer, commandPool);
         ImGui_ImplVulkan_DestroyFontUploadObjects();
 
         flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
@@ -318,6 +320,7 @@ namespace lve
         std::string port
     )
     {
+        auto commanPool = VulkanExtensions::CommandPoolOwner(device);
         ClientMJPEG::HttpClient client(
             host,
             port
@@ -539,7 +542,13 @@ namespace lve
             sampler.compareOp = VK_COMPARE_OP_ALWAYS;
 
             LveTextureStorage::TextureData textureData;
-            if (!lveTextureStorage.loadTexture(processStart + startData, nextBoundaryIndex, sampler, &textureData))
+            if (!lveTextureStorage.loadTexture(
+                processStart + startData,
+                nextBoundaryIndex,
+                sampler,
+                &textureData,
+                commanPool.getPool()
+            ))
             {
                 std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
             }
@@ -555,6 +564,11 @@ namespace lve
 
             std::cout << "Image with size:" << nextBoundaryIndex << std::endl;
             std::cout << std::endl;
+        }
+
+        if (lveTextureStorage.ContainTexture(textureName))
+        {
+            lveTextureStorage.unloadTexture(textureName);
         }
 
         pool.Return(imageBuffer);

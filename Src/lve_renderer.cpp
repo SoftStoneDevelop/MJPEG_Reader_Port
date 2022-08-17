@@ -16,11 +16,13 @@ namespace lve {
 		isFrameStarted{false} 
 	{
 		recreateSwapChain();
+		commandPool = lveDevice.createCommandPool();
 		createCommandBuffers();
 	}
 
 	LveRenderer::~LveRenderer() 
 	{
+		vkDestroyCommandPool(lveDevice.device(), commandPool, nullptr);
 		freeCommandBuffers();
 	}
 
@@ -59,7 +61,7 @@ namespace lve {
 		VkCommandBufferAllocateInfo allocateInfo{};
 		allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocateInfo.commandPool = lveDevice.getCommandPool();
+		allocateInfo.commandPool = commandPool;
 		allocateInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
 		auto result = vkAllocateCommandBuffers(lveDevice.device(), &allocateInfo, commandBuffers.data());
@@ -73,7 +75,7 @@ namespace lve {
 	{
 		vkFreeCommandBuffers(
 			lveDevice.device(),
-			lveDevice.getCommandPool(),
+			commandPool,
 			static_cast<uint32_t>(commandBuffers.size()),
 			commandBuffers.data()
 		);

@@ -2,6 +2,7 @@
 
 #define IMGUI_DISABLE_INCLUDE_IMCONFIG_H = true
 #include "first_app.hpp"
+#include <iostream>
 
 namespace lve 
 {
@@ -13,12 +14,9 @@ namespace lve
 				lveDevice,
 				lveRenderer->getSwapChainRenderPass(),
 				LveSwapChain::MAX_FRAMES_IN_FLIGHT,
-				lveTextureStorage
+				lveTextureStorage,
+				lveRenderer->getCommandPool()
 				);
-	}
-
-	FirstApp::~FirstApp() 
-	{
 	}
 
 	void FirstApp::run() 

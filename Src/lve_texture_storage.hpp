@@ -36,14 +36,16 @@ namespace lve
 		bool loadTexture(
 			const std::string& texturePath,
 			VkSamplerCreateInfo& samplerInfo,
-			TextureData* data
+			TextureData* data,
+			VkCommandPool commandPool
 		);
 
 		bool loadTexture(
 			const char* image,
 			const int& imageSize,
 			VkSamplerCreateInfo& samplerInfo,
-			TextureData* data
+			TextureData* data,
+			VkCommandPool commandPool
 		);
 
 		void storeTexture(const std::string& textureName, TextureData&& data);
@@ -64,7 +66,8 @@ namespace lve
 		void createTextureImage(
 			LveTextureStorage::TextureData& imageData,
 			char* pixels,
-			uint32_t mipLevels
+			uint32_t mipLevels,
+			VkCommandPool commandPool
 		);
 		void destroyAndFreeTextureData(const TextureData& data);
 		void unloadRoutine();
@@ -73,6 +76,7 @@ namespace lve
 
 		LveDevice& lveDevice;
 		std::unique_ptr<LveDescriptorPool> texturePool;
+		std::mutex texturePoolM;
 		std::unique_ptr<LveDescriptorSetLayout> textureSetLayout;
 
 		std::shared_ptr<LveRenderer> lveRenderer;

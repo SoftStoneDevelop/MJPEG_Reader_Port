@@ -5,16 +5,20 @@
 // std lib headers
 #include <string>
 #include <vector>
+#include <mutex>
 
-namespace lve {
+namespace lve 
+{
 
-struct SwapChainSupportDetails {
+struct SwapChainSupportDetails 
+{
   VkSurfaceCapabilitiesKHR capabilities;
   std::vector<VkSurfaceFormatKHR> formats;
   std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct QueueFamilyIndices {
+struct QueueFamilyIndices 
+{
   uint32_t graphicsFamily;
   uint32_t presentFamily;
   bool graphicsFamilyHasValue = false;
@@ -22,7 +26,8 @@ struct QueueFamilyIndices {
   bool isComplete() { return graphicsFamilyHasValue && presentFamilyHasValue; }
 };
 
-class LveDevice {
+class LveDevice 
+{
  public:
 #ifdef NDEBUG
   const bool enableValidationLayers = false;
@@ -39,11 +44,11 @@ class LveDevice {
   LveDevice(LveDevice &&) = delete;
   LveDevice &operator=(LveDevice &&) = delete;
 
-  VkCommandPool getCommandPool() { return commandPool; }
   VkDevice device() { return device_; }
   VkInstance getInstance() { return instance; }
   VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
   VkSurfaceKHR surface() { return surface_; }
+  std::unique_lock<std::mutex> getLockGraphicsQueue() noexcept { return std::unique_lock<std::mutex>(mGraphicsQueue_, std::defer_lock); };
   VkQueue graphicsQueue() { return graphicsQueue_; }
   VkQueue presentQueue() { return presentQueue_; }
 
@@ -59,21 +64,49 @@ class LveDevice {
       VkBufferUsageFlags usage,
       VkMemoryPropertyFlags properties,
       VkBuffer &buffer,
-      VkDeviceMemory &bufferMemory);
-  VkCommandBuffer beginSingleTimeCommands();
-  void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-  void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+      VkDeviceMemory &bufferMemory
+  );
+
+  VkCommandBuffer beginSingleTimeCommands(VkCommandPool commandPool);
+
+  void endSingleTimeCommands(
+      VkCommandBuffer commandBuffer,
+      VkCommandPool commandPool
+  );
+
+  void copyBuffer(
+      VkBuffer srcBuffer,
+      VkBuffer dstBuffer,
+      VkDeviceSize size,
+      VkCommandPool commandPool
+  );
+
   void copyBufferToImage(
       VkBuffer buffer,
       VkImage image,
       uint32_t width,
       uint32_t height,
       uint32_t layerCount,
-      uint32_t mipLevel
+      uint32_t mipLevel,
+      VkCommandPool commandPool
   );
 
-  void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
-  void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+  void transitionImageLayout(
+      VkImage image,
+      VkImageLayout oldLayout,
+      VkImageLayout newLayout,
+      uint32_t mipLevels,
+      VkCommandPool commandPool
+  );
+
+  void generateMipmaps(
+      VkImage image,
+      VkFormat imageFormat,
+      int32_t texWidth,
+      int32_t texHeight,
+      uint32_t mipLevels,
+      VkCommandPool commandPool
+  );
 
   void createImageWithInfo(
       const VkImageCreateInfo &imageInfo,
@@ -89,6 +122,8 @@ class LveDevice {
       uint32_t mipLevels = 1
   );
 
+  VkCommandPool createCommandPool();
+
   VkPhysicalDeviceProperties properties;
 
  private:
@@ -97,7 +132,6 @@ class LveDevice {
   void createSurface();
   void pickPhysicalDevice();
   void createLogicalDevice();
-  void createCommandPool();
 
   // helper functions
   bool isDeviceSuitable(VkPhysicalDevice device);
@@ -113,11 +147,11 @@ class LveDevice {
   VkDebugUtilsMessengerEXT debugMessenger;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   LveWindow &window;
-  VkCommandPool commandPool;
 
   VkDevice device_;
   VkSurfaceKHR surface_;
   VkQueue graphicsQueue_;
+  std::mutex mGraphicsQueue_;
   VkQueue presentQueue_;
 
   const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};

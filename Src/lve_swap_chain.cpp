@@ -130,7 +130,10 @@ namespace lve
         submitInfo.pSignalSemaphores = signalSemaphores;
 
         vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
+        auto lock = device.getLockGraphicsQueue();
+        lock.lock();
         auto rSubmit = vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]);
+        lock.unlock();
         if (rSubmit != VK_SUCCESS)
         {
             throw std::runtime_error("failed to submit draw command buffer!" + VulkanHelpers::AsString(rSubmit));

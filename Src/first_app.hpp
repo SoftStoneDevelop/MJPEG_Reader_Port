@@ -18,7 +18,6 @@ namespace lve
 		static constexpr int HEIGHT = 1080;
 
 		FirstApp();
-		~FirstApp();
 
 		FirstApp(const FirstApp&) = delete;
 		void operator=(const FirstApp&) = delete;

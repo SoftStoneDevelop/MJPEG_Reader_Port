@@ -37,6 +37,11 @@ namespace lve
 			return currentFrameIndex;
 		}
 
+		VkCommandPool getCommandPool() const
+		{
+			return commandPool;
+		}
+
 		/// <returns>Last frame count or current builded frame, if frame in started</returns>
 		int getCurrentFrameCount() const noexcept
 		{
@@ -58,6 +63,7 @@ namespace lve
 
 		std::unique_ptr<LveSwapChain> lveSwapChain;
 		std::vector<VkCommandBuffer> commandBuffers;
+		VkCommandPool commandPool;
 
 		uint32_t currentImageIndex;
 		int currentFrameIndex;
