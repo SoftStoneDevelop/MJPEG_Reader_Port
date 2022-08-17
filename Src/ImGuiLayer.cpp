@@ -91,7 +91,7 @@ namespace lve
 
             path[i] = '\0';
 
-            temp = "31.133.13.58";
+            temp = "31.160.161.51";
             i = 0;
             while (temp[i] != '\0')
             {
@@ -102,7 +102,7 @@ namespace lve
             host[i] = '\0';
             hostValide = validateHost(port);
 
-            temp = "8888";
+            temp = "8081";
             i = 0;
             while (temp[i] != '\0')
             {
@@ -320,7 +320,7 @@ namespace lve
         std::string port
     )
     {
-        auto commanPool = VulkanExtensions::CommandPoolOwner(device);
+        auto commandPool = VulkanExtensions::CommandPoolOwner(device);
         ClientMJPEG::HttpClient client(
             host,
             port
@@ -548,7 +548,7 @@ namespace lve
                 nextBoundaryIndex,
                 sampler,
                 &textureData,
-                commanPool.getPool()
+                commandPool.getPool()
             ))
             {
                 std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
