@@ -127,7 +127,6 @@ namespace lve {
 
         stagingBuffer.map();
         stagingBuffer.writeToBuffer((void*)pixels);
-        stbi_image_free(pixels);
 
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -200,6 +199,7 @@ namespace lve {
 
         uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
         createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels, commandPool);
+        stbi_image_free(pixels);
         lveDevice.createImageView(
             data->imageView,
             data->image,
@@ -245,6 +245,7 @@ namespace lve {
 
         uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
         createTextureImage(*data, reinterpret_cast<char*>(pixels), mipLevels, commandPool);
+        stbi_image_free(pixels);
         lveDevice.createImageView(
             data->imageView,
             data->image,
@@ -261,13 +262,66 @@ namespace lve {
         return true;
     }
 
+    bool LveTextureStorage::loadTexture(
+        char* pixels,
+        VkSamplerCreateInfo& samplerInfo,
+        TextureData* data,
+        VkCommandPool commandPool
+    )
+    {
+        if (pixels == nullptr)
+        {
+            return false;
+        }
+
+        uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(data->texWidth, data->texHeight)))) + 1;
+        createTextureImage(*data, pixels, mipLevels, commandPool);
+        lveDevice.createImageView(
+            data->imageView,
+            data->image,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            mipLevels
+        );
+
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = static_cast<float>(mipLevels);
+        samplerInfo.mipLodBias = 0.0f;
+
+        data->sampler = createTextureSampler(samplerInfo);
+        return true;
+    }
+
+    char* LveTextureStorage::convertToPixels(
+        const char* image,
+        const int& imageSize,
+        int& texWidth,
+        int& texHeight
+    )
+    {
+        int texChannels;
+        auto imagePtr = reinterpret_cast<const stbi_uc*>(image);
+        auto pixels = stbi_load_from_memory(imagePtr, imageSize, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        if (pixels)
+        {
+            return reinterpret_cast<char*>(pixels);
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
     void LveTextureStorage::storeTexture(const std::string& textureName, TextureData&& data)
     {
         assert(textureDatas.count(textureName) == 0 && "Texture already in use");
         textureDatas[textureName] = std::move(data);
     }
 
-    void LveTextureStorage::changeName(const std::string& textureName, const std::string& newTetureName)
+    void LveTextureStorage::changeName(
+        const std::string& textureName,
+        const std::string& newTetureName
+    )
     {
         auto textureData = std::move(textureDatas.at(textureName));
         textureDatas.erase(textureName);
@@ -294,10 +348,9 @@ namespace lve {
     {
         {
             std::lock_guard lg(texturePoolM);
-            for (auto i = data.textureDescriptors.begin(); i != data.textureDescriptors.end(); i++)
+            if (data.textureDescriptor)
             {
-                auto& item = *i;
-                texturePool->freeDescriptors(&item.second, 1);
+                texturePool->freeDescriptors(&data.textureDescriptor, 1);
             }
         }
 
@@ -308,16 +361,15 @@ namespace lve {
     }
 
     const VkDescriptorSet LveTextureStorage::getDescriptorSet(
-        const std::string& textureName,
-        const std::string& samplerName
+        const std::string& textureName
     )
     {
         if (textureDatas.count(textureName) == 0)
             return nullptr;
 
         auto& textureData = textureDatas.at(textureName);
-        if (textureData.textureDescriptors.count(samplerName) != 0)
-            return textureData.textureDescriptors.at(samplerName);
+        if (textureData.textureDescriptor)
+            return textureData.textureDescriptor;
 
         auto descriptorImage = descriptorInfo(textureName);
         VkDescriptorSet descriptorSet{};
@@ -329,7 +381,7 @@ namespace lve {
                 .build(descriptorSet);
         }
 
-        textureData.textureDescriptors[samplerName] = descriptorSet;
+        textureData.textureDescriptor = descriptorSet;
         return descriptorSet;
     }
 

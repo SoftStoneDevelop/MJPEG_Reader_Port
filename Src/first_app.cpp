@@ -33,7 +33,7 @@ namespace lve
 				lveRenderer->beginSwapChainRenderPass(commandBuffer);
 
 				//order here matters
-                imGuiLayer->Draw(commandBuffer, lveTextureStorage);
+                imGuiLayer->Draw(commandBuffer, lveTextureStorage, lveRenderer->getCommandPool());
 
                 lveRenderer->endSwapChainRenderPass(commandBuffer);
 				lveRenderer->endFrame();

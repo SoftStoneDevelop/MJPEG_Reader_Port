@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include <stb_image.h>
 
 namespace lve 
 {
@@ -26,14 +27,45 @@ namespace lve
             VkCommandPool commandPool
         );
         ~ImGuiLayer();
-        void Draw(VkCommandBuffer commandBuffer, LveTextureStorage& lveTextureStorage);
+        void Draw(
+            VkCommandBuffer commandBuffer,
+            LveTextureStorage& lveTextureStorage,
+            VkCommandPool commandPool
+        );
     private:
         struct Camera
         {
+        public:
+            char* GetPixelPtr() const { return unprocessedPixels; }
+            std::unique_lock<std::mutex> GetLockPixel() { return std::unique_lock<std::mutex>(pixelsM); }
+            void SetPixel(char* pixels)
+            {
+                if (unprocessedPixels)
+                {
+                    stbi_image_free(unprocessedPixels);
+                }
+                unprocessedPixels = pixels;
+            };
+
+            void ResetPixel()
+            {
+                if (unprocessedPixels)
+                {
+                    stbi_image_free(unprocessedPixels);
+                }
+                unprocessedPixels = nullptr;
+            };
+
             volatile bool stop = false;
             int CameraNumber;
             std::string CameraName;
             std::thread thread;
+
+            int texWidth;
+            int texHeight;
+        private:
+            char* unprocessedPixels = nullptr;
+            std::mutex pixelsM;
         };
 
         void readImageStream(
@@ -62,6 +94,6 @@ namespace lve
         ArrayPool::ArrayPool<char> pool;
 
         std::atomic<int> cameraIndex = 0;
-        std::mutex m;
+        int selectedCamera;
     };
 }  // namespace lve

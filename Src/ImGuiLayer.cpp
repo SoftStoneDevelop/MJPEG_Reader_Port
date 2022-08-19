@@ -144,7 +144,11 @@ namespace lve
         delete[] path;
 	}
 
-    void ImGuiLayer::Draw(VkCommandBuffer commandBuffer, LveTextureStorage& lveTextureStorage)
+    void ImGuiLayer::Draw(
+        VkCommandBuffer commandBuffer,
+        LveTextureStorage& lveTextureStorage,
+        VkCommandPool commandPool
+    )
     {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -261,18 +265,51 @@ namespace lve
                 ImGui::BeginListBox("Cameras", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y - ImGui::GetStyle().ItemSpacing.y - textSize.y));
                 ImGui::PushID("##VerticalScrolling");
 
-                {
+                {//camera items
                     int qSize = cameras.size();
-                    std::lock_guard lg(m);
                     while (qSize > 0)
                     {
                         auto item = std::move( cameras.front());
                         cameras.pop();
-                        auto textureCameraName = std::format("camera{}", item->CameraNumber);
-                        if (lveTextureStorage.ContainTexture(textureCameraName))
+                        auto textureName = std::format("camera{}", item->CameraNumber);
+
+                        auto lock = item->GetLockPixel();
+
+                        auto pixels = item->GetPixelPtr();
+                        if (pixels)
                         {
-                            auto& tData = lveTextureStorage.getTextureData(textureCameraName);
-                            auto info = lveTextureStorage.getDescriptorSet(textureCameraName, defaultSamplerName);
+                            VkSamplerCreateInfo sampler{};
+                            sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+                            sampler.magFilter = VK_FILTER_LINEAR;
+                            sampler.minFilter = VK_FILTER_LINEAR;
+                            sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                            sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                            sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                            sampler.anisotropyEnable = VK_TRUE;
+                            sampler.maxAnisotropy = device.properties.limits.maxSamplerAnisotropy;
+                            sampler.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+                            sampler.unnormalizedCoordinates = VK_FALSE;
+                            sampler.compareEnable = VK_FALSE;
+                            sampler.compareOp = VK_COMPARE_OP_ALWAYS;
+
+                            LveTextureStorage::TextureData textureData{};
+                            textureData.texHeight = item->texHeight;
+                            textureData.texWidth = item->texWidth;
+                            if (lveTextureStorage.loadTexture(pixels, sampler, &textureData, commandPool))
+                            {
+                                lveTextureStorage.unloadTexture(textureName);
+                                lveTextureStorage.storeTexture(textureName, std::move(textureData));
+                            }
+
+                            item->ResetPixel();
+                        }
+
+                        lock.unlock();
+
+                        if (lveTextureStorage.ContainTexture(textureName))
+                        {
+                            auto& tData = lveTextureStorage.getTextureData(textureName);
+                            auto info = lveTextureStorage.getDescriptorSet(textureName);
                             auto itemSizeAv = ImGui::GetContentRegionAvail();
                             ImGui::Image(
                                 info,
@@ -297,7 +334,8 @@ namespace lve
                             cameras.push(std::move(item));
                         }
                         qSize--;
-                    }
+
+                    }//camera items
                 }
 
                 ImGui::PopID();
@@ -320,7 +358,6 @@ namespace lve
         std::string port
     )
     {
-        auto commandPool = VulkanExtensions::CommandPoolOwner(device);
         ClientMJPEG::HttpClient client(
             host,
             port
@@ -527,37 +564,23 @@ namespace lve
                 continue;
             }
 
-            VkSamplerCreateInfo sampler{};
-            sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            sampler.magFilter = VK_FILTER_LINEAR;
-            sampler.minFilter = VK_FILTER_LINEAR;
-            sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            sampler.anisotropyEnable = VK_TRUE;
-            sampler.maxAnisotropy = device.properties.limits.maxSamplerAnisotropy;
-            sampler.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-            sampler.unnormalizedCoordinates = VK_FALSE;
-            sampler.compareEnable = VK_FALSE;
-            sampler.compareOp = VK_COMPARE_OP_ALWAYS;
-
-            std::lock_guard lg(m);
-            LveTextureStorage::TextureData textureData;
-            if (!lveTextureStorage.loadTexture(
-                processStart + startData,
-                nextBoundaryIndex,
-                sampler,
-                &textureData,
-                commandPool.getPool()
-            ))
+            auto lock = camera->GetLockPixel();
+            auto pixels =
+                lveTextureStorage.convertToPixels(
+                    processStart + startData,
+                    nextBoundaryIndex,
+                    camera->texWidth,
+                    camera->texHeight
+                );
+            if (pixels)
             {
-                std::cout << "Image fail with size:" << nextBoundaryIndex << std::endl;
+                camera->SetPixel(pixels);
             }
             else
             {
-                lveTextureStorage.unloadTexture(textureName);
-                lveTextureStorage.storeTexture(textureName, std::move(textureData));
+                std::cout << "Image fail convert to pixels, image size:" << nextBoundaryIndex << std::endl;
             }
+            lock.unlock();
 
             payloadSize -= startData + nextBoundaryIndex;
             payloadOffset += startData + nextBoundaryIndex;
@@ -570,6 +593,8 @@ namespace lve
         {
             lveTextureStorage.unloadTexture(textureName);
         }
+
+        camera->ResetPixel();
 
         pool.Return(imageBuffer);
         pool.Return(readBuffer);

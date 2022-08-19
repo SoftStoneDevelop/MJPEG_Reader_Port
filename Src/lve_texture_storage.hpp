@@ -21,7 +21,7 @@ namespace lve
 			VkDeviceMemory imageMemory;
 			int texWidth; 
 			int texHeight;
-			std::unordered_map<std::string, VkDescriptorSet> textureDescriptors;
+			VkDescriptorSet textureDescriptor;
 			int unloadAskFrame;
 
 			VkSampler sampler;
@@ -48,6 +48,20 @@ namespace lve
 			VkCommandPool commandPool
 		);
 
+		char* convertToPixels(
+			const char* image,
+			const int& imageSize,
+			int& texWidth,
+			int& texHeight
+		);
+
+		bool loadTexture(
+			char* pixels,
+			VkSamplerCreateInfo& samplerInfo,
+			TextureData* data,
+			VkCommandPool commandPool
+		);
+
 		void storeTexture(const std::string& textureName, TextureData&& data);
 		void changeName(const std::string& textureName, const std::string& newTetureName);
 		void unloadTexture(const std::string& textureName);
@@ -58,7 +72,7 @@ namespace lve
 		VkDescriptorImageInfo descriptorInfo(const std::string& textureName);
 
 		const LveDescriptorSetLayout& getTextureDescriptorSetLayout() const { return *textureSetLayout; }
-		const VkDescriptorSet getDescriptorSet(const std::string& textureName, const std::string& samplerName);
+		const VkDescriptorSet getDescriptorSet(const std::string& textureName);
 
 		const TextureData& getTextureData (const std::string& textureName);
 		bool ContainTexture(const std::string& textureName);
