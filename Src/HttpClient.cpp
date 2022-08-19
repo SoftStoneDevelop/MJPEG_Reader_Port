@@ -159,6 +159,11 @@ namespace ClientMJPEG
 			return false;
 		}
 
+		u_long iMode = 1;
+		iResult = ioctlsocket(_connectSocket, FIONBIO, &iMode);
+		if (iResult != NO_ERROR)
+			printf("ioctlsocket failed with error: %ld\n", iResult);
+
 		_streamInProcess = true;
 		return _streamInProcess;
 	}
@@ -196,12 +201,24 @@ namespace ClientMJPEG
 				break;
 			}
 
+			auto currentTime = std::chrono::high_resolution_clock::now();
 			assert(_readBuffer != nullptr && "_readBuffer is nullptr");
 			auto recived = recv(_connectSocket, _readBuffer, _readBufferSize, 0);
-			if (recived == 0 || recived < 0)
+			if (recived < 0)
+			{
+				_isReading = false;
+				_readBuffer = nullptr;
+				_promise.set_value(recived);
+				continue;
+			}
+			else if(recived == 0)
 			{
 				closesocket(_connectSocket);
 				WSACleanup();
+				_streamInProcess = false;
+				_isConnected = false;
+				_isReading = false;
+				_readBuffer = nullptr;
 				_promise.set_value(recived);
 				break;
 			}

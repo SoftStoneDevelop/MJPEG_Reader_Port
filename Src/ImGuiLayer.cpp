@@ -280,7 +280,7 @@ namespace lve
 
                         if (!item->unprocessedPixels.empty())
                         {
-                            auto& imageData = item->unprocessedPixels.front();
+                            auto imageData = item->unprocessedPixels.front();
                             item->unprocessedPixels.pop();
                             lock.unlock();
                             VkSamplerCreateInfo sampler{};
@@ -382,6 +382,7 @@ namespace lve
         int realSize;
         char* readBuffer = pool.Rent(readBufferSize, realSize);
         readBufferSize = realSize;
+        int readBufferOffset = 0;
 
         std::future<int> readAsync = client.ReadAsync(readBuffer, readBufferSize);
 
@@ -390,9 +391,15 @@ namespace lve
         while (!camera->stop)
         {
             auto readSize = readAsync.get();
-            if (readSize <= 0)
+            if (readSize == 0)
             {
+                std::cout << "Close socket" << std::endl;
                 break;
+            }
+            else if (readSize < 0)
+            {
+                readAsync = client.ReadAsync(readBuffer, readBufferSize);
+                continue;
             }
 
             int index = 0;
@@ -429,6 +436,7 @@ namespace lve
                 {
                     std::shift_left(readBuffer, readBuffer + readBufferSize, index);
                     readAsync = client.ReadAsync(readBuffer + (readSize - index), readBufferSize - (readSize - index));
+                    readBufferOffset = (readSize - index);
                 }
 
                 break;
@@ -439,13 +447,26 @@ namespace lve
 
         char boundary[70]{};
         int boundarySize = 0;
-        int payloadSize = 0;
         while (!camera->stop)
         {
             auto readSize = readAsync.get();
-            if (readSize <= 0)
+            if (readSize == 0)
             {
+                std::cout << "Close socket" << std::endl;
                 break;
+            }
+            else if (readSize < 0)
+            {
+                if (readBufferOffset > 0)
+                {
+                    readSize = readBufferOffset;
+                    readBufferOffset = 0;
+                }
+                else
+                {
+                    readAsync = client.ReadAsync(readBuffer, readBufferSize);
+                    continue;
+                }
             }
 
             auto boundaryEnd = false;
@@ -462,12 +483,13 @@ namespace lve
                     if (i == readSize - 1)
                     {
                         readAsync = client.ReadAsync(readBuffer, readBufferSize);
+                        readBufferOffset = 0;
                     }
                     else
                     {
                         std::shift_left(readBuffer + i, readBuffer + readSize, readBufferSize - i);
                         readAsync = client.ReadAsync(readBuffer + (readSize - i), readBufferSize - (readSize - i));
-                        payloadSize = readSize - i;
+                        readBufferOffset = readSize - i;
                     }
 
                     break;
@@ -501,14 +523,29 @@ namespace lve
             &cv
         );
 
+        int payloadSize = 0;
         const char* startDataMark = "\r\n\r\n";
-
+        auto currentTime = std::chrono::high_resolution_clock::now();
         while (!camera->stop)
         {
             auto readSize = readAsync.get();
-            if (readSize <= 0)
+            if (readSize == 0)
             {
+                std::cout << "Close socket"<< std::endl;
                 break;
+            }
+            else if (readSize < 0)
+            {
+                if (readBufferOffset > 0)
+                {
+                    readSize = readBufferOffset;
+                    readBufferOffset = 0;
+                }
+                else
+                {
+                    readAsync = client.ReadAsync(readBuffer, readBufferSize);
+                    continue;
+                }
             }
 
             if (imageBufferSize - payloadSize < readBufferSize)
@@ -596,6 +633,11 @@ namespace lve
 
             payloadSize -= startData + nextBoundaryIndex;
             payloadOffset += startData + nextBoundaryIndex;
+
+            auto newTime = std::chrono::high_resolution_clock::now();
+            float frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
+            currentTime = newTime;
+            std::cout << "Image time:" << frameTime << std::endl;
         }
 
         if (convertThread.joinable())
