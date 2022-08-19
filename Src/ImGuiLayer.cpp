@@ -262,7 +262,10 @@ namespace lve
                     );
 
                 auto textSize = ImGui::CalcTextSize(frameText.c_str());
-                ImGui::BeginListBox("Cameras", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y - ImGui::GetStyle().ItemSpacing.y - textSize.y));
+                ImGui::BeginListBox(
+                    "Cameras",
+                    ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y - ImGui::GetStyle().ItemSpacing.y - textSize.y)
+                );
                 ImGui::PushID("##VerticalScrolling");
 
                 {//camera items
@@ -321,6 +324,7 @@ namespace lve
                             );
                         }
 
+                        ImGui::PushID((void*)item.get());
                         if (ImGui::Button("Close camera"))
                         {
                             item->stop = true;
@@ -333,6 +337,7 @@ namespace lve
                         {
                             cameras.push(std::move(item));
                         }
+                        ImGui::PopID();
                         qSize--;
 
                     }//camera items
