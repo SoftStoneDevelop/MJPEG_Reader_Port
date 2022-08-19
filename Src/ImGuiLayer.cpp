@@ -525,7 +525,7 @@ namespace lve
 
         int payloadSize = 0;
         const char* startDataMark = "\r\n\r\n";
-        auto currentTime = std::chrono::high_resolution_clock::now();
+        
         while (!camera->stop)
         {
             auto readSize = readAsync.get();
@@ -633,11 +633,6 @@ namespace lve
 
             payloadSize -= startData + nextBoundaryIndex;
             payloadOffset += startData + nextBoundaryIndex;
-
-            auto newTime = std::chrono::high_resolution_clock::now();
-            float frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
-            currentTime = newTime;
-            std::cout << "Image time:" << frameTime << std::endl;
         }
 
         if (convertThread.joinable())
