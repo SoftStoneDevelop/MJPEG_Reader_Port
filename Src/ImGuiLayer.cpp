@@ -281,6 +281,7 @@ namespace lve
                         if (!item->unprocessedPixels.empty())
                         {
                             auto& imageData = item->unprocessedPixels.front();
+                            item->unprocessedPixels.pop();
                             lock.unlock();
                             VkSamplerCreateInfo sampler{};
                             sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -306,7 +307,6 @@ namespace lve
                             }
 
                             item->ResetPixel(imageData.pixels);
-                            item->unprocessedPixels.pop();
                         }
                         else
                         {
