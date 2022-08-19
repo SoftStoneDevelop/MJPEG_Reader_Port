@@ -276,11 +276,12 @@ namespace lve
                         cameras.pop();
                         auto textureName = std::format("camera{}", item->CameraNumber);
 
-                        auto lock = item->GetLockPixel();
+                        auto lock = item->GetLockQueuePixel();
 
-                        auto pixels = item->GetPixelPtr();
-                        if (pixels)
+                        if (!item->unprocessedPixels.empty())
                         {
+                            auto& imageData = item->unprocessedPixels.front();
+                            lock.unlock();
                             VkSamplerCreateInfo sampler{};
                             sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
                             sampler.magFilter = VK_FILTER_LINEAR;
@@ -296,18 +297,21 @@ namespace lve
                             sampler.compareOp = VK_COMPARE_OP_ALWAYS;
 
                             LveTextureStorage::TextureData textureData{};
-                            textureData.texHeight = item->texHeight;
-                            textureData.texWidth = item->texWidth;
-                            if (lveTextureStorage.loadTexture(pixels, sampler, &textureData, commandPool))
+                            textureData.texHeight = imageData.texHeight;
+                            textureData.texWidth = imageData.texWidth;
+                            if (lveTextureStorage.loadTexture(imageData.pixels, sampler, &textureData, commandPool))
                             {
                                 lveTextureStorage.unloadTexture(textureName);
                                 lveTextureStorage.storeTexture(textureName, std::move(textureData));
                             }
 
-                            item->ResetPixel();
+                            item->ResetPixel(imageData.pixels);
+                            item->unprocessedPixels.pop();
                         }
-
-                        lock.unlock();
+                        else
+                        {
+                            lock.unlock();
+                        }
 
                         if (lveTextureStorage.ContainTexture(textureName))
                         {
@@ -485,7 +489,20 @@ namespace lve
         imageBufferSize = realSize;
         int payloadOffset = 0;
 
+        auto imagesQueue = std::queue<IncomeData>();
+        auto imagesQueueM = std::mutex();
+        auto cv = std::condition_variable();
+        auto convertThread = std::thread(
+            &ImGuiLayer::convertPixel,
+            this,
+            camera,
+            &imagesQueue,
+            &imagesQueueM,
+            &cv
+        );
+
         const char* startDataMark = "\r\n\r\n";
+
         while (!camera->stop)
         {
             auto readSize = readAsync.get();
@@ -569,29 +586,22 @@ namespace lve
                 continue;
             }
 
-            auto lock = camera->GetLockPixel();
-            auto pixels =
-                lveTextureStorage.convertToPixels(
-                    processStart + startData,
-                    nextBoundaryIndex,
-                    camera->texWidth,
-                    camera->texHeight
-                );
-            if (pixels)
+            auto incomeData = pool.Rent(nextBoundaryIndex, realSize);
+            std::copy(processStart + startData, processStart + startData + nextBoundaryIndex, incomeData);
             {
-                camera->SetPixel(pixels);
+                std::lock_guard lg(imagesQueueM);
+                imagesQueue.emplace(incomeData, nextBoundaryIndex);
+                cv.notify_all();
             }
-            else
-            {
-                std::cout << "Image fail convert to pixels, image size:" << nextBoundaryIndex << std::endl;
-            }
-            lock.unlock();
 
             payloadSize -= startData + nextBoundaryIndex;
             payloadOffset += startData + nextBoundaryIndex;
+        }
 
-            std::cout << "Image with size:" << nextBoundaryIndex << std::endl;
-            std::cout << std::endl;
+        if (convertThread.joinable())
+        {
+            cv.notify_all();
+            convertThread.join();
         }
 
         if (lveTextureStorage.ContainTexture(textureName))
@@ -599,11 +609,70 @@ namespace lve
             lveTextureStorage.unloadTexture(textureName);
         }
 
-        camera->ResetPixel();
+        while (!imagesQueue.empty())
+        {
+            pool.Return(imagesQueue.front().data);
+            imagesQueue.pop();
+        }
+
+        while (!camera->unprocessedPixels.empty())
+        {
+            camera->ResetPixel(camera->unprocessedPixels.front().pixels);
+            camera->unprocessedPixels.pop();
+        }
 
         pool.Return(imageBuffer);
         pool.Return(readBuffer);
         pool.Return(boundary);
+    }
+
+    void ImGuiLayer::convertPixel(
+        std::shared_ptr<Camera> camera,
+        std::queue<IncomeData>* imageQueue,
+        std::mutex* imageQueueM,
+        std::condition_variable* cv
+    )
+    {
+        while (!camera->stop)
+        {
+            std::unique_lock ul(*imageQueueM);
+            if (imageQueue->empty())
+            {
+                cv->wait(ul);
+                if (camera->stop)
+                {
+                    break;
+                }
+            }
+            else
+            {
+                auto image = imageQueue->front();
+                imageQueue->pop();
+                ul.unlock();
+
+                int imageWidth, imageHeight;
+                auto pixels =
+                    lveTextureStorage.convertToPixels(
+                        image.data,
+                        image.dataSize,
+                        imageWidth,
+                        imageHeight
+                    );
+
+                if (pixels)
+                {
+                    auto cameraLock = camera->GetLockQueuePixel();
+                    camera->PushData(pixels, imageWidth, imageHeight);
+                    cameraLock.unlock();
+                }
+                else
+                {
+                    std::cout << "Image fail convert to pixels, image size:" << image.dataSize << std::endl;
+                }
+
+                pool.Return(image.data);
+            }
+        }
     }
 
     bool ImGuiLayer::validateHost(const char* input)

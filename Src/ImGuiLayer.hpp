@@ -18,6 +18,12 @@ namespace lve
     class ImGuiLayer
     {
     public:
+        struct IncomeData
+        {
+            char* data;
+            int dataSize;
+        };
+
         ImGuiLayer(
             LveWindow& window,
             LveDevice& device,
@@ -36,24 +42,25 @@ namespace lve
         struct Camera
         {
         public:
-            char* GetPixelPtr() const { return unprocessedPixels; }
-            std::unique_lock<std::mutex> GetLockPixel() { return std::unique_lock<std::mutex>(pixelsM); }
-            void SetPixel(char* pixels)
+            struct ImageData
             {
-                if (unprocessedPixels)
-                {
-                    stbi_image_free(unprocessedPixels);
-                }
-                unprocessedPixels = pixels;
+                char* pixels;
+                int texWidth;
+                int texHeight;
             };
 
-            void ResetPixel()
+            std::unique_lock<std::mutex> GetLockQueuePixel() { return std::unique_lock<std::mutex>(queueM); }
+            void PushData(char* pixels, int texWidth, int texHeight)
             {
-                if (unprocessedPixels)
+                unprocessedPixels.emplace(pixels, texWidth, texHeight);
+            };
+
+            void ResetPixel(char* pixels)
+            {
+                if (pixels)
                 {
-                    stbi_image_free(unprocessedPixels);
+                    stbi_image_free(pixels);
                 }
-                unprocessedPixels = nullptr;
             };
 
             volatile bool stop = false;
@@ -61,11 +68,9 @@ namespace lve
             std::string CameraName;
             std::thread thread;
 
-            int texWidth;
-            int texHeight;
+            std::queue<ImageData> unprocessedPixels;
         private:
-            char* unprocessedPixels = nullptr;
-            std::mutex pixelsM;
+            std::mutex queueM;
         };
 
         void readImageStream(
@@ -74,6 +79,14 @@ namespace lve
             std::string path,
             std::string port
         );
+
+        void convertPixel(
+            std::shared_ptr<Camera> camera,
+            std::queue<IncomeData>* imageQueue,
+            std::mutex* imageQueueM,
+            std::condition_variable* cv
+        );
+
         bool validatePort(const char* input);
         bool validateHost(const char* input);
 
