@@ -157,10 +157,10 @@ namespace ClientMJPEG
 			return false;
 		}
 
-		u_long iMode = 1;
+		/*u_long iMode = 1;
 		iResult = ioctlsocket(_connectSocket, FIONBIO, &iMode);
 		if (iResult != NO_ERROR)
-			printf("ioctlsocket failed with error: %ld\n", iResult);
+			printf("ioctlsocket failed with error: %ld\n", iResult);*/
 
 		_streamInProcess = true;
 		return _streamInProcess;
