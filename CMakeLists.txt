@@ -27,7 +27,8 @@ if (NOT STB_IMAGE_PATH)
   set(STB_IMAGE_PATH External/stb)
 endif()
 
-set(ArrayPool_PATH External/ArrayPool/Src/)
+set(ArrayPool_PATH ArrayPool/Src/)
+set(ThreadPool_PATH ThreadPool/Src/)
 
 if (DEFINED VULKAN_SDK_PATH)
   set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK_PATH}/Include") # 1.1 Make sure this include path is correct
@@ -84,6 +85,7 @@ if (WIN32)
     ${Vulkan_INCLUDE_DIRS}
     ${GLFW_INCLUDE_DIRS}
     ${ArrayPool_PATH}
+    ${ThreadPool_PATH}
     ${IMGUI_PATH}
     ${STB_IMAGE_PATH}
     )
@@ -100,6 +102,7 @@ elseif (UNIX)
     target_include_directories(${PROJECT_NAME} PUBLIC
       ${PROJECT_SOURCE_DIR}/src
       ${ArrayPool_PATH}
+      ${ThreadPool_PATH}
       ${IMGUI_PATH}
       ${STB_IMAGE_PATH}
     )

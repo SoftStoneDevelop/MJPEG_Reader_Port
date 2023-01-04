@@ -64,10 +64,10 @@ namespace lve
                 }
             };
 
-            volatile bool stop = false;
+            std::atomic<bool> stop = false;
             int CameraNumber;
             std::string CameraName;
-            std::thread thread;
+            std::future<void> streamTask;
 
             std::queue<ImageData> unprocessedPixels;
         private:
@@ -106,7 +106,7 @@ namespace lve
         int pathSize;
         std::queue<std::shared_ptr<Camera>> cameras;
         ArrayPool::ArrayPool<char> pool;
-        //ThreadPool::ThreadPool threadPool{0};
+        ThreadPool::ThreadPool threadPool{0};
 
         std::atomic<int> cameraIndex = 0;
         int selectedCamera;

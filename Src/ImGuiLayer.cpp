@@ -135,10 +135,7 @@ namespace lve
         {
             auto item = std::move(cameras.front());
             cameras.pop();
-            if (item->thread.joinable())
-            {
-                item->thread.join();
-            }
+            item->streamTask.get();
         }
 
         delete[] path;
@@ -236,8 +233,8 @@ namespace lve
                     auto camera = std::make_shared<Camera>();
                     camera->CameraName = "Some name";
                     camera->CameraNumber = cameraIndex++;
-                    camera->thread = std::thread(
-                        &ImGuiLayer::readImageStream,
+                    camera->streamTask = 
+                        threadPool.enqueue(&ImGuiLayer::readImageStream,
                         this,
                         camera,
                         std::string(host),
@@ -332,10 +329,7 @@ namespace lve
                         if (ImGui::Button("Close camera"))
                         {
                             item->stop = true;
-                            if (item->thread.joinable())
-                            {
-                                item->thread.join();
-                            }
+                            item->streamTask.get();
                         }
                         else
                         {
@@ -514,15 +508,12 @@ namespace lve
         auto imagesQueue = std::queue<IncomeData>();
         auto imagesQueueM = std::mutex();
         auto cv = std::condition_variable();
-        ThreadPool::ThreadPool threadPool(1);
-        auto convertThread = std::thread(
-            &ImGuiLayer::convertPixel,
+        auto convertTask = threadPool.enqueue(&ImGuiLayer::convertPixel,
             this,
             camera,
             &imagesQueue,
             &imagesQueueM,
-            &cv
-        );
+            &cv);
 
         int payloadSize = 0;
         const char* startDataMark = "\r\n\r\n";
@@ -636,11 +627,7 @@ namespace lve
             payloadOffset += startData + nextBoundaryIndex;
         }
 
-        if (convertThread.joinable())
-        {
-            cv.notify_all();
-            convertThread.join();
-        }
+        convertTask.get();
 
         if (lveTextureStorage.ContainTexture(textureName))
         {
