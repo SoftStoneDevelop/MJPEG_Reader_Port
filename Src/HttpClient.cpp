@@ -157,6 +157,7 @@ namespace ClientMJPEG
 			return false;
 		}
 
+		//TODO #2 swich between many sockets and read data in one thread not in thread per socket
 		/*u_long iMode = 1;
 		iResult = ioctlsocket(_connectSocket, FIONBIO, &iMode);
 		if (iResult != NO_ERROR)
