@@ -627,6 +627,7 @@ namespace lve
             payloadOffset += startData + nextBoundaryIndex;
         }
 
+        cv.notify_all();
         convertTask.get();
 
         if (lveTextureStorage.ContainTexture(textureName))
