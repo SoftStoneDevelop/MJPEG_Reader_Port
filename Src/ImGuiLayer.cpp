@@ -25,7 +25,8 @@ namespace lve
         : device{ lveDevice },
         lveTextureStorage{ textureStorage },
         path{ new char[100] },
-        pathSize{100}
+        pathSize{100},
+        threadPool{ std::make_shared<ThreadPool::ThreadPool>(0) }
 	{
         imGuiPool = LveDescriptorPool::Builder(device)
             .setMaxSets(LveSwapChain::MAX_FRAMES_IN_FLIGHT)
@@ -135,7 +136,10 @@ namespace lve
         {
             auto item = std::move(cameras.front());
             cameras.pop();
-            item->streamTask.get();
+            if (item->streamTask.valid())
+            {
+                item->streamTask.get();
+            }
         }
 
         delete[] path;
@@ -234,7 +238,7 @@ namespace lve
                     camera->CameraName = "Some name";
                     camera->CameraNumber = cameraIndex++;
                     camera->streamTask = 
-                        threadPool.enqueue(&ImGuiLayer::readImageStream,
+                        threadPool->enqueue(&ImGuiLayer::readImageStream,
                         this,
                         camera,
                         std::string(host),
@@ -329,7 +333,10 @@ namespace lve
                         if (ImGui::Button("Close camera"))
                         {
                             item->stop = true;
-                            item->streamTask.get();
+                            if (item->streamTask.valid())
+                            {
+                                item->streamTask.get();
+                            }
                         }
                         else
                         {
@@ -363,7 +370,8 @@ namespace lve
     {
         ClientMJPEG::HttpClient client(
             host,
-            port
+            port,
+            threadPool
         );
         std::string error;
         client.Connect(&error);
@@ -508,7 +516,7 @@ namespace lve
         auto imagesQueue = std::queue<IncomeData>();
         auto imagesQueueM = std::mutex();
         auto cv = std::condition_variable();
-        auto convertTask = threadPool.enqueue(&ImGuiLayer::convertPixel,
+        auto convertTask = threadPool->enqueue(&ImGuiLayer::convertPixel,
             this,
             camera,
             &imagesQueue,

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <future>
+#include <memory>
 
 #include <windows.h>
 #include <winsock2.h>
@@ -16,13 +17,18 @@
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
 
+#include <ThreadPool.hpp>
 
 namespace ClientMJPEG
 {
 	class HttpClient
 	{
 	public:
-		HttpClient(const std::string& host, const std::string& port);
+		HttpClient(
+			const std::string& host,
+			const std::string& port,
+			std::shared_ptr<ThreadPool::ThreadPool> threadPool
+			);
 		~HttpClient();
 
 		HttpClient(const HttpClient& other) = delete;
@@ -47,11 +53,12 @@ namespace ClientMJPEG
 		std::string _port;
 		SOCKET _connectSocket = INVALID_SOCKET;
 		std::mutex _m;
-		volatile bool _sendShutdown = false;
-		volatile bool _isConnected = false;
+		std::atomic<bool> _sendShutdown = false;
+		std::atomic<bool> _isConnected = false;
 		
+		std::future<void> _readTask;
 		std::promise<int> _promise;
-		std::thread* _readThread = nullptr;
+		std::shared_ptr<ThreadPool::ThreadPool> threadPool;
 		std::condition_variable _cv;
 		volatile bool _isReading = false;
 		volatile bool _streamInProcess = false;

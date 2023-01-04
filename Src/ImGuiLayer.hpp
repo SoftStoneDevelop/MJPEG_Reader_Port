@@ -106,7 +106,7 @@ namespace lve
         int pathSize;
         std::queue<std::shared_ptr<Camera>> cameras;
         ArrayPool::ArrayPool<char> pool;
-        ThreadPool::ThreadPool threadPool{0};
+        std::shared_ptr<ThreadPool::ThreadPool> threadPool;
 
         std::atomic<int> cameraIndex = 0;
         int selectedCamera;

@@ -10,10 +10,10 @@ namespace ClientMJPEG
 {
 	HttpClient::HttpClient(
 		const std::string& host,
-		const std::string& port
-	) : _host{ host }, _port{ std::move(port) }
+		const std::string& port,
+		std::shared_ptr<ThreadPool::ThreadPool> threadPool
+	) : _host{ host }, _port{ std::move(port) }, threadPool{ std::move(threadPool) }
 	{
-
 	}
 
 	HttpClient::~HttpClient()
@@ -29,12 +29,10 @@ namespace ClientMJPEG
 			_cv.notify_all();
 		}
 
-		if (_readThread != nullptr)
+		if (_readTask.valid())
 		{
-			_readThread->join();
-			delete _readThread;
+			_readTask.get();
 		}
-
 		_readBuffer = nullptr;
 
 		if (_isConnected)
@@ -173,18 +171,15 @@ namespace ClientMJPEG
 		std::lock_guard lg(_m);
 		if (!_streamInProcess || _isReading)
 		{
-			_promise = std::promise<int>();
-			_promise.set_value(0);
-			return _promise.get_future();
+			throw std::runtime_error("Stream not started or trying to read from many threads");
 		}
 
 		_promise = std::promise<int>();
-		_isReading = true;
 		_readBuffer = buffer;
 		_readBufferSize = bufferSize;
 
-		if (_readThread == nullptr)
-			_readThread = new std::thread(&HttpClient::readData, this);
+		_readTask = threadPool->enqueue(&HttpClient::readData, this);
+		_isReading = true;
 
 		_cv.notify_all();
 		return _promise.get_future();
@@ -192,41 +187,38 @@ namespace ClientMJPEG
 
 	void HttpClient::readData()
 	{
-		while (_streamInProcess)
+		std::unique_lock<std::mutex> lock(_m);
+		_cv.wait(lock, [&] {return _isReading || !_streamInProcess; });
+		if (!_streamInProcess)
 		{
-			std::unique_lock<std::mutex> lock(_m);
-			_cv.wait(lock, [&] {return _isReading || !_streamInProcess; });
-			if (!_streamInProcess)
-			{
-				break;
-			}
+			_promise.set_value(0);
+			return;
+		}
 
-			auto currentTime = std::chrono::high_resolution_clock::now();
-			assert(_readBuffer != nullptr && "_readBuffer is nullptr");
-			auto recived = recv(_connectSocket, _readBuffer, _readBufferSize, 0);
-			if (recived < 0)
-			{
-				_isReading = false;
-				_readBuffer = nullptr;
-				_promise.set_value(recived);
-				continue;
-			}
-			else if(recived == 0)
-			{
-				closesocket(_connectSocket);
-				WSACleanup();
-				_streamInProcess = false;
-				_isConnected = false;
-				_isReading = false;
-				_readBuffer = nullptr;
-				_promise.set_value(recived);
-				break;
-			}
-
+		assert(_readBuffer != nullptr && "_readBuffer is nullptr");
+		auto recived = recv(_connectSocket, _readBuffer, _readBufferSize, 0);
+		if (recived < 0)
+		{
+			_promise.set_value(recived);
 			_isReading = false;
 			_readBuffer = nullptr;
-			_promise.set_value(recived);
+			return;
 		}
+		else if (recived == 0)
+		{
+			closesocket(_connectSocket);
+			WSACleanup();
+			_promise.set_value(recived);
+			_streamInProcess = false;
+			_isConnected = false;
+			_isReading = false;
+			_readBuffer = nullptr;
+			return;
+		}
+
+		_promise.set_value(recived);
+		_isReading = false;
+		_readBuffer = nullptr;
 	}
 
 }//namespace ClientMJPEG
