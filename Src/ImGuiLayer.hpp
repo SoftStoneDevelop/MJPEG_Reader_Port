@@ -5,7 +5,8 @@
 #include "lve_descriptors.hpp"
 #include "lve_texture_storage.hpp"
 
-#include <ArrayPool.hpp>
+#include "../ArrayPool/Src/ArrayPool.hpp"
+#include "../ThreadPool/Src/ThreadPool.hpp"
 
 // libs
 #include "imgui.h"
@@ -105,6 +106,7 @@ namespace lve
         int pathSize;
         std::queue<std::shared_ptr<Camera>> cameras;
         ArrayPool::ArrayPool<char> pool;
+        //ThreadPool::ThreadPool threadPool{0};
 
         std::atomic<int> cameraIndex = 0;
         int selectedCamera;

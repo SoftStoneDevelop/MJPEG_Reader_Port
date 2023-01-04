@@ -514,6 +514,7 @@ namespace lve
         auto imagesQueue = std::queue<IncomeData>();
         auto imagesQueueM = std::mutex();
         auto cv = std::condition_variable();
+        ThreadPool::ThreadPool threadPool(1);
         auto convertThread = std::thread(
             &ImGuiLayer::convertPixel,
             this,
